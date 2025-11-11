@@ -14,7 +14,7 @@
 |   Target Process  |  <---->	|    pwntracer (Tracer) |
 |   (Tracee)        |  ptrace	|                       |
 +-------------------+      	+-----------------------+
-                                    |
+                                    | 	
                                     v
                     +-----------------------+
                     |   Policy Engine       |
@@ -36,7 +36,7 @@
 
 **GOAL**: Build a simple tracer that can start/attach a process and log every syscall it makes.
 
-- **Deliverable**: Binary runs `./pwntracer /bin/cat /etc/passwd` and prints a list of all syscalls (by name and number) with thier arguments and returns values.
+- **Deliverable**: Binary runs `./pwntrace -binary /usr/bin/cat /etc/passwd` and prints a list of all syscalls (by name and number) with thier arguments and returns values.
 
 #### Tasks
 
@@ -48,6 +48,7 @@
 	- `RAX`
 5. syscall mapping: Create a lookup table to map syscall numbers to thier names
 	- use `/usr/include/asm/unistd_64.h`
+
 
 ### Phase 2: Policy Engine
 
@@ -92,3 +93,83 @@
 1. Proxy backend: A process that can execute syscalls on behalf of the target.
 2. Commnucation Channel: IPC mechanism between the tracer and the proxy backend.
 3. Stub execution: when a syscall is to be proxied, the tracer stops the target, sends the syscall details to the proxy, waits for response, and then injects the return value/data back into the target process.
+
+
+
+---
+---
+---
+---
+
+Commands
+
+```
+pwntrace v1.0 -
+Target: [5432] binary
+> help
+
+CORE COMMANDS:
+  status                    - Show tracer status
+  pause                     - Pause execution
+  resume                    - Resume execution
+  detach                    - Detach and let target continue normally
+  
+POLICY MANAGEMENT:
+  policies list             - List all active policies
+  policies add <syscall> <action> [conditions] - Add new policy
+  policies remove <id>      - Remove policy by ID
+  policies reload           - Reload from config file
+  
+SYSCALL CONTROL:
+  syscalls trace <name/number>     - Trace specific syscall
+  syscalls ignore <name/number>    - Stop tracing syscall
+  syscalls break <name/number>     - Break on syscall entry
+  syscalls allow <name/number>     - Allow syscall temporarily
+  syscalls deny <name/number>      - Deny syscall temporarily
+  
+INSPECTION:
+  inspect registers         - Show current register state
+  inspect memory <addr> <len> - Dump memory from target
+  inspect backtrace         - Show target call stack
+  inspect threads           - List all threads
+  
+MODIFICATION:
+  modify return <value>     - Modify next syscall return
+  modify arg <index> <value> - Modify syscall argument
+  modify memory <addr> <hex> - Write to target memory
+  
+ANALYSIS:
+  stats                     - Show syscall statistics
+  search calls <pattern>    - Search previous syscalls
+  export trace <file>       - Export trace to file
+  
+CONFIGURATION:
+  config set <key> <value>  - Change runtime setting
+  config save <file>        - Save current state to config
+  
+
+---
+
+> syscalls trace openat
+[+] Now tracing openat syscalls
+
+> policies add connect deny "port=1337"
+[+] Policy added: ID 15 - Deny connect when port=1337
+
+> inspect registers
+RAX: 0x02 (SYS_OPEN)
+RDI: 0x7ffe12345678 → "/etc/passwd"
+RSI: O_RDONLY
+
+> modify arg 0 0x7ffe12345999
+[+] Changed RDI to point to "/tmp/fake_passwd"
+
+> stats
+TOTAL SYSCALLS: 1,247
+MOST FREQUENT:
+  read: 456 (36.5%)
+  write: 234 (18.7%)
+  openat: 123 (9.8%)
+BLOCKED: 15
+MODIFIED: 8
+```
