@@ -1,21 +1,25 @@
-#include "logging.h"
+#include "logging.hpp"
 #include <stdarg.h>
 #include <time.h>
+#include <string>
 static const char* level_strings[] = { "DEBUG", "INFO", "WARN", "ERROR", "DATA"};
 static const char* level_colors[] = {
     "\x1b[36m", // DEBUG - Cyan
     "\x1b[32m", // INFO  - Green
     "\x1b[33m", // WARN  - Yellow
     "\x1b[31m",  // ERROR - Red
-    "\x1b[29m"  
+    "\x1b[29m",
+    "\x1b[35m"  
 };
+
+using namespace std;
 
 #define COLOR_RESET "\x1b[0m"
 
 char log_path[BUFFER_SIZE];
 
 // set log_file
-void set_logfile_path(char *path) {
+void set_logfile_path(const char* path) {
     strncpy(log_path, path, BUFFER_SIZE - 1);
 }
 
