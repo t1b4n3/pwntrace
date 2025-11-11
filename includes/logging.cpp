@@ -2,7 +2,7 @@
 #include <stdarg.h>
 #include <time.h>
 #include <string>
-static const char* level_strings[] = { "DEBUG", "INFO", "WARN", "ERROR", "DATA"};
+static const char* level_strings[] = { "DEBUG", "INFO", "WARN", "ERROR", "DATA", "RESULT"};
 static const char* level_colors[] = {
     "\x1b[36m", // DEBUG - Cyan
     "\x1b[32m", // INFO  - Green
