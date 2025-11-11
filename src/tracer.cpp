@@ -1,6 +1,6 @@
 #include "./tracer.hpp"
 
-#include "../includes/logging.hpp"
+#include "./logging.hpp"
 #include "./read_memory.hpp"
 #include "./syscall_table.hpp"
 using namespace std;

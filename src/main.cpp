@@ -17,7 +17,7 @@
 #include "./syscall_table.hpp"
 #include "./read_memory.hpp"
 #include "./tracer.hpp"
-#include "../includes/logging.hpp"
+#include "./logging.hpp"
 
 
 using namespace std;
@@ -54,7 +54,7 @@ int main(int argc, char* argv[]) {
 		usage(argv[0]);
 		return 1;
 	} else {
-		set_logfile_path("./logfile");
+		set_logfile_path("./pwntrace_logs");
 		tracer(pid, pathname);
 	}
 

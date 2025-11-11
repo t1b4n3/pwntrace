@@ -8,8 +8,8 @@ static const char* level_colors[] = {
     "\x1b[32m", // INFO  - Green
     "\x1b[33m", // WARN  - Yellow
     "\x1b[31m",  // ERROR - Red
-    "\x1b[29m",
-    "\x1b[35m"  
+    "\x1b[29m", //DATA
+    "\x1b[35m" , // result
 };
 
 using namespace std;

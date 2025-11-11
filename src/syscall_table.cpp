@@ -13,10 +13,10 @@ SyscallTable::SyscallTable() {
     	};
 
 	// get archittecture
-	char arch[0x32];
-	struct utsname buffer;
-	if (uname(&buffer) != 0) strcpy(arch, "Unknown"); 
-	else snprintf(arch, 0x31, "%s", buffer.machine);
+	//char arch[0x32];
+	//struct utsname buffer;
+	//if (uname(&buffer) != 0) strcpy(arch, "Unknown"); 
+	//else snprintf(arch, 0x31, "%s", buffer.machine);
 	
 	for (int i = 0; possible_paths[i] != nullptr; i++) {
 		ifstream file(possible_paths[i]);
