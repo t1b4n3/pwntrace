@@ -15,7 +15,7 @@
 #include <iomanip>
 
 #include "./syscall_table.hpp"
-#include "./read_memory.hpp"
+#include "./memory.hpp"
 #include "./tracer.hpp"
 #include "./logging.hpp"
 
@@ -24,18 +24,18 @@ using namespace std;
 
 
 static void usage(const char* prog) {
-    cerr << "Usage: " << prog << " -binary /path/to/program  OR  -pid <pid>\n";
-    cerr << "Example: sudo " << prog << " -binary /bin/ls\n";
-    cerr << "         sudo " << prog << " -pid 1234\n";
+    cerr << "Usage: " << prog << " -binary /path/to/program  OR  -pid <pid> -config ./path/to/config\n";
+    cerr << "Example: sudo " << prog << " -binary /bin/ls -config ./policy.json\n";
+    cerr << "         sudo " << prog << " -pid 1234 -config ./policy.json\n";
 }
 
 int main(int argc, char* argv[]) {
-	if (argc < 3) {
+	if (argc < 5) {
 		usage(argv[0]);
 		exit(0);
 	}
 	pid_t pid = -1;
-	string pathname;
+	string pathname, config_path;
 	
 	if (strcmp(argv[1], "-pid") == 0)
         	pid = atoi(argv[2]);
@@ -46,6 +46,12 @@ int main(int argc, char* argv[]) {
     	    	return 1;
     	}
 	
+	if (strcmp(argv[3], "-config") == 0) {
+		config_path = argv[4];
+	} else {
+		usage(argv[0]);
+		exit(0);
+	}
 
 
 
@@ -55,7 +61,7 @@ int main(int argc, char* argv[]) {
 		return 1;
 	} else {
 		set_logfile_path("./pwntrace_logs");
-		tracer(pid, pathname);
+		tracer(pid, pathname, config_path);
 	}
 
 	return 0;
