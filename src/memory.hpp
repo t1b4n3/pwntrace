@@ -1,5 +1,5 @@
-#ifndef READ_MEMORY_HPP
-#define READ_MEMORY_HPP
+#ifndef MEMORY_HPP
+#define MEMORY_HPP
 
 #include <cstdint>
 #include <cstdlib>
@@ -28,9 +28,16 @@ bool is_user_address(uint64_t addr);
 
 class ReadMemory {
 	public: 
-	string read_string(pid_t pid, uint64_t addr, size_t maxlen = 256);
-	vector<uint8_t> read_bytes(pid_t pid, uint64_t addr, size_t maxlen = 256);
+		string read_string(pid_t pid, uint64_t addr, size_t maxlen = 256);
+		vector<uint8_t> read_bytes(pid_t pid, uint64_t addr, size_t maxlen = 256);
 	//string hexdump(const vector<uint8_t>& data, size_t max_display = 64); // show in proxy 
 };
+
+class WriteMemory {
+	public:
+		void write_string(pid_t target, uint64_t addr, string to_write); 
+		ssize_t write_remote_memory(pid_t target, void *addr, const void *buf, size_t len);
+};
+
 
 #endif

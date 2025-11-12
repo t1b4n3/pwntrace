@@ -1,4 +1,4 @@
-#include "read_memory.hpp"
+#include "memory.hpp"
 
 bool is_user_address(uint64_t addr) {
 	if (addr < 0x1000) return false; // likely kernel / NULL / invalid
@@ -56,4 +56,29 @@ vector<uint8_t> ReadMemory::read_bytes(pid_t pid, uint64_t addr, size_t maxlen) 
 		}
 	}
 	return return_value;
+}
+
+void WriteMemory::write_string(pid_t target, uint64_t addr, string to_write) {
+	if (!is_user_address(addr)) return;
+	write_remote_memory(target, reinterpret_cast<void*>(addr), to_write.c_str(), to_write.size() + 1);
+}
+
+ssize_t WriteMemory::write_remote_memory(pid_t target, void *addr, const void *buf, size_t len) {
+	errno = 0;
+	size_t written = 0;
+	size_t word_size = sizeof(long);
+	const uint8_t *src = reinterpret_cast<const uint8_t*>(buf);
+	uintptr_t dst = reinterpret_cast<uintptr_t>(addr);
+	long data;
+	size_t chunk = 0;
+	while (written < len) {
+		data = 0;
+		chunk = min(word_size, len - written);
+
+		memcpy(&data, src + written, chunk);
+
+		if (ptrace(PTRACE_POKEDATA, target, (void*)(dst + written), (void*)data) == -1) return -1;
+		written += chunk;
+	}
+	return static_cast<ssize_t>(written);
 }
