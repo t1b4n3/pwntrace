@@ -1,27 +1,18 @@
 #include "./tracer.hpp"
 
-#include "./logging.hpp"
-#include "./read_memory.hpp"
-#include "./syscall_table.hpp"
+
 using namespace std;
-
-
-typedef enum {
-	SYSCALL_ENTRY, 
-	SYSCALL_EXIT,
-} SYSCALL;
 
 struct user_regs_struct regs;
 
-void print_syscall(SYSCALL sys, pid_t target) {
+void print_syscall(SYSCALL sys, pid_t target, PolicyEngine policy_engine) {
 	ReadMemory read_mem;
 	SyscallTable table;
 	string syscall_name;
 	string data;
 
 #if defined(__x86_64__)
-
-
+	if (!policy_engine.should_trace(regs.orig_rax)) return;
 	if (sys == SYSCALL_ENTRY) {
 		cout << endl;
 		log_message(LOG_RESULT, "PID %d SYSCALL entry: num=%llu args=(0x%llx,0x%llx,0x%llx,0x%llx,0x%llx,0x%llx)",
@@ -44,10 +35,12 @@ void print_syscall(SYSCALL sys, pid_t target) {
         		(unsigned long long)regs.orig_rax,
         		(unsigned long long)regs.rax);
 
-		printf("[-] ret=%llx\n", regs.rax);
+		printf("[-] ret=0x%llx\n", regs.rax);
 
 	}	
 #elif defined(__i386__) // x86
+	if (!policy_engine.should_trace(regs.orig_eax)) return;
+
 	if (sys == SYSCALL_ENTRY) {
 		log_message(LOG_RESULT, "PID %d SYSCALL entry: num=%lu args=(0x%lx,0x%lx,0x%lx,0x%lx,0x%lx,0x%lx)",
             		target,
@@ -60,8 +53,8 @@ void print_syscall(SYSCALL sys, pid_t target) {
             		(unsigned long)regs.ebp);
 
 		printf("[+] Syscall %d - %s\n( rdi=%d rsi=%p rdx=%d ) mem[%s]\n", 
-			regs.orig_eax, table.get_syscall_name(regs.orig_eax).c_str(), regs.edi,
-			regs.esi, regs.edx, read_mem.read_string(target, regs.esi, 256).c_str()
+			regs.orig_eax, table.get_syscall_name(regs.orig_eax).c_str(), regs.ebx,
+			regs.eci, regs.edx, read_mem.read_string(target, regs.eci, 256).c_str()
 		);	
 
 	} else {
@@ -69,6 +62,8 @@ void print_syscall(SYSCALL sys, pid_t target) {
             	        target,
             	        (unsigned long)regs.orig_eax,
             	        (unsigned long)regs.eax);
+
+		printf("[-] ret=0x%llx\n", regs.eax);
 	}
 
 #else
@@ -76,9 +71,37 @@ void print_syscall(SYSCALL sys, pid_t target) {
 #endif
 }
 
+vector<string> read_syscall_args(pid_t, int syscall_no, struct user_regs_struct regs) {
+	vector<string> x;
+	x.push_back("hello");
+	return x;
+}
 
-void tracer(pid_t pid, string pathname) {
+void deny_syscall(pid_t target, int syscall_no, Policy policy) {
+	regs.orig_rax = -1;
+	regs.rax = policy.stub_return;
+	ptrace(PTRACE_SETREGS, target, 0, &regs);
+}
+
+void modify_syscall(pid_t target, int syscall_no, struct user_regs_struct regs, Policy policy) {
+	ReadMemory read_mem;
+	WriteMemory write_mem;
+	long arg;
+#if defined(__x86_64__)
+	arg = regs.rsi;
+#elif defined(__i386__) 
+	arg = regs.ecx;
+#endif
+	if (policy.condition != read_mem.read_string(target, arg, 256)) return;
+	write_mem.write_string(target, arg, policy.modify);
+}
+
+void tracer(pid_t pid, string pathname, string config_path) {
 	log_message(LOG_INFO, "Pwntrace");
+	PolicyEngine policy_engine(config_path);
+	SyscallTable table;
+
+
 	int status;
 	pid_t target;
 	bool launched_child = false;
@@ -94,13 +117,6 @@ void tracer(pid_t pid, string pathname) {
 			log_message(LOG_ERROR, "waitpid(after attach) failed: %s", strerror(errno));
 			exit(1);
 		}
-
-		//if (ptrace(PTRACE_GETREGS, pid, NULL, &regs) == -1) {
-		//	log_message(LOG_ERROR, "PTRACE_GETREGS failed");
-		//	exit(0);
-		//}
-
-		//print_regs();
 
 		if (WIFEXITED(status) || WIFSIGNALED(status)) {
 			log_message(LOG_ERROR, "Target died after attach | status=0x%x", status);
@@ -169,6 +185,7 @@ void tracer(pid_t pid, string pathname) {
 	bool in_syscall = false;
 	bool is_syscall_stop = false;
 	int signal = 0;
+	int syscall_no = -1;
 	while (true) {
 		if (waitpid(target, &status, 0) == -1) { 
 			log_message(LOG_ERROR, "waitpid filed inside loop");
@@ -195,8 +212,6 @@ void tracer(pid_t pid, string pathname) {
         			    // We assume it's a syscall stop if PTRACE_SYSCALL was used.
         			    is_syscall_stop = true;
         		}
-			
-
         		if (is_syscall_stop) {
         	    		// read registers
         	    		if (ptrace(PTRACE_GETREGS, target, NULL, &regs) == -1) {
@@ -208,18 +223,36 @@ void tracer(pid_t pid, string pathname) {
         	       			}
         	       			continue;
 				}
+#if defined(__x86_64__)
+				syscall_no = regs.orig_rax;
+#elif defined(__i386__) // x86
+				syscall_no = regs.orig_eax;
+#endif
+				Policy policy = policy_engine.evaluate(syscall_no);
 
-        			if (!in_syscall) {
-                			// syscall entry
-					// send to proxy
-                			in_syscall = true;	
-					print_syscall(SYSCALL_ENTRY, target);
-            			} else {
-                			// syscall exit
-					// send to proxy
-                			in_syscall = false;
-                			print_syscall(SYSCALL_EXIT, target);
-            			}
+				switch (policy.action) {
+					case ACTION_TYPE::DENY:
+						// skip syscall and ret fake return
+						printf("\n[--] DENY : %d - %s", policy.syscall_no, policy.syscall);
+						deny_syscall(target, policy.syscall_no, policy);
+						break;
+					case ACTION_TYPE::MODIFY:
+						printf("\n[**] MODIFY : %d - %s", policy.syscall_no, policy.syscall);
+						modify_syscall(target, policy.syscall_no, regs, policy);
+					default:
+						//  do nothing let syscall execute normally | ACTION_TYPE::ALLOW:
+						if (!in_syscall) {
+                					// syscall entry
+                					in_syscall = true;
+							print_syscall(SYSCALL_ENTRY, target, policy_engine);
+            					} else {
+                					// syscall exit
+                					in_syscall = false;
+                					print_syscall(SYSCALL_EXIT, target, policy_engine);
+            					}
+						break;
+				
+				}
 
 				if (ptrace(PTRACE_SYSCALL, target, NULL, NULL) == -1) {
 					log_message(LOG_ERROR, "PTRACE_SYSCALL continue failed: %s", strerror(errno));
