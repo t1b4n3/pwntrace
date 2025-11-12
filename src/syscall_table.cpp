@@ -2,6 +2,7 @@
 
 unordered_map<int, string> SyscallTable::syscall_names;
 unordered_map<string, int> SyscallTable::syscall_nums;
+
 SyscallTable::SyscallTable() {
 	const char* possible_paths[] = {
         	"/usr/include/asm/unistd_64.h",
@@ -51,6 +52,8 @@ string SyscallTable::get_syscall_name(int syscall_num) {
 	auto it = syscall_names.find(syscall_num);
 	if (it != syscall_names.end()) {
 		return it->second;
+	} else if (syscall_num == -1) {
+		return "Syscall Denied : " + to_string(syscall_num); 
 	}
 	return "Unknown syscall : " + to_string(syscall_num);
 }
