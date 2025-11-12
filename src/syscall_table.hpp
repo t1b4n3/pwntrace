@@ -27,11 +27,13 @@ using namespace std;
 class SyscallTable {
 	private:
 		static unordered_map<int, string> syscall_names;
+		static unordered_map<string, int> syscall_nums;
 		
 
 	public:
 		SyscallTable();
-		string get_syscall_name(int syscall_num);	
+		string get_syscall_name(int syscall_num);
+		int get_syscall_no(string syscall_);
 		static void parse_header_file(const string& filename);
 };
 

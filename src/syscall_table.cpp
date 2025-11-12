@@ -1,7 +1,7 @@
 #include "syscall_table.hpp"
 
 unordered_map<int, string> SyscallTable::syscall_names;
-
+unordered_map<string, int> SyscallTable::syscall_nums;
 SyscallTable::SyscallTable() {
 	const char* possible_paths[] = {
         	"/usr/include/asm/unistd_64.h",
@@ -41,6 +41,7 @@ void SyscallTable::parse_header_file(const string& filename) {
 				string name = matches[1];
 				int number = stoi(matches[2]);
 				syscall_names[number] = name;
+				syscall_nums[name] = number;
 			}
 		}
 	}
@@ -52,4 +53,12 @@ string SyscallTable::get_syscall_name(int syscall_num) {
 		return it->second;
 	}
 	return "Unknown syscall : " + to_string(syscall_num);
+}
+
+int SyscallTable::get_syscall_no(string syscall_) {
+	auto it = syscall_nums.find(syscall_);
+	if (it != syscall_nums.end()) {
+		return it->second;
+	}
+	return -1;
 }
