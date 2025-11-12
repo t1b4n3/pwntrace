@@ -3,24 +3,26 @@
 		"id":1,
 		"syscall": "execve",
 		"action": "deny",
-		"comment": "Block process execution",
 		"enabled":true
 	},
 	{
 		"id":2,
 		"syscall": "openat",
 		"action": "modify",
-		"condition":"/ect/passwd",
-		"modify": "/tmp/fake_passwd",
-		"comment":"Redirect file access",
+		"condition":"home",
+		"modify": "text",
 		"enabled":true
 	},
 	{
 		"id":3,
 		"syscall": "open",
-		"action": "allow",
-		"comment":"allow open",
+		"action": "deny",
+		"enabled":true
+	},
+	{
+		"id":4,
+		"syscall": "close",
+		"action": "deny",
 		"enabled":true
 	}
-
 ]
