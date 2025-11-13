@@ -6,7 +6,7 @@ SRCS := $(shell find $(SRC_DIRS) -name '*.cpp')
 
 CC = g++
 
-CFLAGS = -g
+CFLAGS = -g -std=c++17 
 
 $(shell mkdir -p $(BUILD_DIR))
 
