@@ -31,6 +31,14 @@ string ReadMemory::read_string(pid_t pid, uint64_t addr, size_t maxlen) {
 	return s;
 }
 
+long ReadMemory::read_int(pid_t pid, uint64_t addr) {
+	if (!is_user_address(addr)) return -1;
+	errno = 0;
+	long word = ptrace(PTRACE_PEEKDATA, pid, (void*)(addr), NULL);
+	if (word == -1 && errno != 0) return -1;
+	return word;
+}
+
 vector<uint8_t> ReadMemory::read_bytes(pid_t pid, uint64_t addr, size_t maxlen) {
 	vector<uint8_t> return_value;
 	return_value.reserve(maxlen);
@@ -57,6 +65,17 @@ vector<uint8_t> ReadMemory::read_bytes(pid_t pid, uint64_t addr, size_t maxlen) 
 	}
 	return return_value;
 }
+
+//bool WriteMemory::modify_register(pid_t target, long register_t, variant<int, string> &value) {
+//	if (!is_user_address(register_t)) return false;
+//
+//	if (holds_alternative<int>(value)) {
+//		register_t = get<int>(value);
+//	} else {
+//		write_string(target, register_t, get<string>(value));
+//	}
+//	return true;
+//}
 
 void WriteMemory::write_string(pid_t target, uint64_t addr, string to_write) {
 	if (!is_user_address(addr)) return;

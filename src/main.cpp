@@ -13,6 +13,9 @@
 #include <vector>
 #include <sstream>
 #include <iomanip>
+#include <variant>
+#include <optional>
+#include <stdexcept>
 
 #include "./syscall_table.hpp"
 #include "./memory.hpp"

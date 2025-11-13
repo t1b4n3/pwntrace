@@ -1,8 +1,5 @@
 #include "./tracer.hpp"
 
-
-using namespace std;
-
 struct user_regs_struct regs;
 
 void print_syscall(SYSCALL sys, pid_t target, PolicyEngine policy_engine) {
@@ -71,30 +68,6 @@ void print_syscall(SYSCALL sys, pid_t target, PolicyEngine policy_engine) {
 #endif
 }
 
-vector<string> read_syscall_args(pid_t, int syscall_no, struct user_regs_struct regs) {
-	vector<string> x;
-	x.push_back("hello");
-	return x;
-}
-
-void deny_syscall(pid_t target, int syscall_no, Policy policy) {
-	regs.orig_rax = -1;
-	regs.rax = policy.stub_return;
-	ptrace(PTRACE_SETREGS, target, 0, &regs);
-}
-
-void modify_syscall(pid_t target, int syscall_no, struct user_regs_struct regs, Policy policy) {
-	ReadMemory read_mem;
-	WriteMemory write_mem;
-	long arg;
-#if defined(__x86_64__)
-	arg = regs.rsi;
-#elif defined(__i386__) 
-	arg = regs.ecx;
-#endif
-	if (policy.condition != read_mem.read_string(target, arg, 256)) return;
-	write_mem.write_string(target, arg, policy.modify);
-}
 
 void tracer(pid_t pid, string pathname, string config_path) {
 	log_message(LOG_INFO, "Pwntrace");
@@ -233,12 +206,20 @@ void tracer(pid_t pid, string pathname, string config_path) {
 				switch (policy.action) {
 					case ACTION_TYPE::DENY:
 						// skip syscall and ret fake return
-						printf("\n[--] DENY : %d - %s", policy.syscall_no, policy.syscall);
-						deny_syscall(target, policy.syscall_no, policy);
+						if (!in_syscall) {
+							in_syscall = true;
+							policy_engine.deny_syscall(target, policy.syscall_no, regs, policy);
+						} else {
+							in_syscall = false;
+						}
 						break;
 					case ACTION_TYPE::MODIFY:
-						printf("\n[**] MODIFY : %d - %s", policy.syscall_no, policy.syscall);
-						modify_syscall(target, policy.syscall_no, regs, policy);
+						if (!in_syscall) {
+							in_syscall = true;
+							policy_engine.modify_syscall(target, policy.syscall_no, regs, policy);
+						} else {
+							in_syscall = false;
+						}
 					default:
 						//  do nothing let syscall execute normally | ACTION_TYPE::ALLOW:
 						if (!in_syscall) {
@@ -276,5 +257,4 @@ void tracer(pid_t pid, string pathname, string config_path) {
     		}
 	}
 	log_message(LOG_INFO, "Pwntrace DONE");
-	log_message(LOG_INFO, "---------------------------");
 }

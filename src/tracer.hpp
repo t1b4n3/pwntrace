@@ -16,6 +16,9 @@
 #include <vector>
 #include <sstream>
 #include <iomanip>
+#include <variant>
+#include <optional>
+#include <stdexcept>
 
 #include "./logging.hpp"
 #include "./memory.hpp"
@@ -24,21 +27,18 @@
 
 using namespace std;
 using namespace nlohmann;
+using std::get;
+using std::holds_alternative;
 
 typedef enum {
 	SYSCALL_ENTRY, 
 	SYSCALL_EXIT,
 } SYSCALL;
 
-vector<string> read_syscall_args(pid_t, int syscall_no, struct user_regs_struct regs);
 
 void print_syscall(SYSCALL sys, pid_t target, PolicyEngine policy_engine);
 
 void tracer(pid_t pid, string pathname, string config_path);
-
-void modify_syscall(pid_t target, int syscall_no, struct user_regs_struct regs, Policy policy);
-
-void deny_syscall(pid_t target, int syscall_no, Policy policy);
 
 
 #endif
