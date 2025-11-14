@@ -6,7 +6,8 @@ SRCS := $(shell find $(SRC_DIRS) -name '*.cpp')
 
 CC = g++
 
-CFLAGS = -g -std=c++17 
+CFLAGS = -g -std=c++20
+LDFLAGS = -lreadline -lhistory  -lncurses
 
 $(shell mkdir -p $(BUILD_DIR))
 
@@ -14,7 +15,7 @@ $(shell mkdir -p $(BUILD_DIR))
 all: $(TARGET)
 
 $(TARGET): $(SRCS)
-	$(CC) $(CFLAGS) $(SRCS) -o $(TARGET)
+	$(CC) $(CFLAGS) $(SRCS) -o $(TARGET) $(LDFLAGS)
 clean:
 	rm -r $(BUILD_DIR)
 
