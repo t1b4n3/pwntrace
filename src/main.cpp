@@ -20,52 +20,127 @@
 #include "./syscall_table.hpp"
 #include "./memory.hpp"
 #include "./tracer.hpp"
+#include "./ui.hpp"
 #include "./logging.hpp"
-
 
 using namespace std;
 
+pid_t pid = -1;
+string pathname;
+string config_path;
+string program_name;
 
-static void usage(const char* prog) {
-    cerr << "Usage: " << prog << " -binary /path/to/program  OR  -pid <pid> -config ./path/to/config\n";
-    cerr << "Example: sudo " << prog << " -binary /bin/ls -config ./policy.json\n";
-    cerr << "         sudo " << prog << " -pid 1234 -config ./policy.json\n";
+static void help() {
+    cerr << "Usage: " << program_name << " -binary /path/to/program  OR  -pid <pid> -config ./path/to/config\n";
+    cerr << "Example: sudo " << program_name << " -binary /bin/ls -config ./policy.json\n";
+    cerr << "         sudo " << program_name << " -pid 1234 -config ./policy.json\n";
+}
+
+bool is_config_loaded() {
+	return !config_path.empty();
+}
+
+void add_commands() {
+	pid_t pid = -1;
+	auto& run = GlobalCLI.add_group("run");
+	auto& add = GlobalCLI.add_group("add");
+	auto& hp = GlobalCLI.add_group("help");
+
+	hp.add("_defualt", "help", [&](auto args){
+		help();
+	});
+
+	add.add("policy", "policy file", [&](auto args){
+		if (args.empty()) {
+			cout << "[-] Usage: add policy <path/to/policy.json>" << endl;
+			return;
+		}
+		string tmp = args[0];
+		if (access(tmp.c_str(), F_OK)) {
+			cout << "[-] File no found || Permissions denied\n";
+			return;
+		}
+		config_path = tmp;
+	});
+
+	add.add("pid", "attach to a running pid", [&](auto args){
+		if (args.empty()) {
+			cout << "[-] Usage: add pid <PID>" << endl;
+			return;
+		}
+		try {
+			pid_t tmp = stoi(args[0]);
+			pid = tmp;
+		} catch (const exception &e) {
+			cout << "[-] Invalid PID: " << args[0] << endl;
+			return;
+		}
+	});
+
+	add.add("bin", "start a new process", [&](auto args){
+		if (args.empty()) {
+			cout << "[-] Usage: add bin <path/to/binary>" << endl;
+			return;
+		}
+		string tmp = args[0];
+		if (access(tmp.c_str(), F_OK)) {
+			cout << "[-] Executable no found || Permissions denied\n";
+			return;
+		}
+		pathname = tmp;
+	});
+
+
+
+
+
+	run.add("_defualt", "run", [&](auto args){
+		if (pathname.empty() || pid == -1) {
+			cout << "[-] add binary or attach to running process first" << endl;
+			return;
+		}
+		tracer(pid, pathname, config_path);
+	});
+
+	run.add("pid", "attach to a running pid", [&](auto args){
+		if (args.empty()) {
+			cout << "[-] Usage: run pid <PID>" << endl;
+			return;
+		}
+		try {
+			pid = stoi(args[0]);
+		} catch (const exception &e) {
+			cout << "[-] Invalid PID: " << args[0] << endl;
+			return;
+		}
+		if (!is_config_loaded()) {
+			cout << "[-] load policy file first" << endl;
+			return;
+		}
+		tracer(pid, pathname, config_path);
+	});
+
+	run.add("bin", "start a new process", [&](auto args){
+		if (args.empty()) {
+			cout << "[-] Usage: run binary <path/to/binary>" << endl;
+			return;
+		}
+		pathname = args[0];
+		if (access(pathname.c_str(), F_OK)) {
+			cout << "[-] Executable no found || Permissions denied\n";
+			return;
+		}
+		if (!is_config_loaded()) {
+			cout << "[-] load policy file first" << endl;
+			return;
+		}
+		tracer(pid, pathname, config_path);
+	});
 }
 
 int main(int argc, char* argv[]) {
-	if (argc < 5) {
-		usage(argv[0]);
-		exit(0);
-	}
-	pid_t pid = -1;
-	string pathname, config_path;
-	
-	if (strcmp(argv[1], "-pid") == 0)
-        	pid = atoi(argv[2]);
-    	else if (strcmp(argv[1], "-binary") == 0)
-    	    	pathname = argv[2];
-    	else {
-    	    	cerr << "Invalid option\n";
-    	    	return 1;
-    	}
-	
-	if (strcmp(argv[3], "-config") == 0) {
-		config_path = argv[4];
-	} else {
-		usage(argv[0]);
-		exit(0);
-	}
-
-
-
-	if (pid == -1 && pathname.empty()) {
-		cerr << "[-] No valid mode selected." << endl;
-		usage(argv[0]);
-		return 1;
-	} else {
-		set_logfile_path("./pwntrace_logs");
-		tracer(pid, pathname, config_path);
-	}
-
+	program_name = argv[0];
+	add_commands();
+	GlobalCLI.cli();	
 	return 0;
 }
