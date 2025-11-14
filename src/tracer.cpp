@@ -21,11 +21,31 @@ void print_syscall(SYSCALL sys, pid_t target, PolicyEngine policy_engine) {
                 	(unsigned long long)regs.r10,
                 	(unsigned long long)regs.r8,
                 	(unsigned long long)regs.r9);
-
-		printf("[+] Syscall %llu - %s\n( rdi=0x%llx rsi=0x%llx rdx=0x%llx ) mem[%s]\n", 
-			regs.orig_rax, table.get_syscall_name(regs.orig_rax).c_str(), regs.rdi,
-			regs.rsi, regs.rdx, read_mem.read_string(target, regs.rsi, 256).c_str()
-		);	
+		
+		if (regs.orig_rax == 0) {
+			printf("[+] Syscall %llu - %s Enter Data : 0x%llx -> ", 
+				regs.orig_rax, table.get_syscall_name(regs.orig_rax).c_str(), regs.rsi);
+		} else if (regs.orig_rax == 1) {
+			printf("[+] Syscall %llu - %s\nWrote Data : 0x%llx -> %s\n",
+			regs.orig_rax, table.get_syscall_name(regs.orig_rax).c_str(), regs.rsi, 
+			read_mem.read_string(target, regs.rsi).c_str());
+		} else if (regs.orig_rax == 2) {
+			printf("[+] Syscall %llu - %s\nOpening : %s Flags : %d",
+				regs.orig_rax, table.get_syscall_name(regs.orig_rax).c_str(),
+				read_mem.read_string(target, regs.rsi, 256), regs.rdx
+				);
+		} else if (regs.orig_rax == 3) {
+			printf("[+] Syscall %llu - %s\nClosing : %d\n",
+				regs.orig_rax, table.get_syscall_name(regs.orig_rax).c_str(), 
+				regs.rax
+				);
+		}
+		else {
+			printf("[+] Syscall %llu - %s\n( rdi=0x%llx rsi=0x%llx rdx=0x%llx ) mem[%s]\n", 
+				regs.orig_rax, table.get_syscall_name(regs.orig_rax).c_str(), regs.rdi,
+				regs.rsi, regs.rdx, read_mem.read_string(target, regs.rsi, 256).c_str()
+			);	
+		}
 	} else {
 		log_message(LOG_RESULT, "PID %d SYSCALL exit:  num=%llu => ret=0x%llx",
         		target,
