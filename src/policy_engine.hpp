@@ -13,6 +13,7 @@
 #include <stdexcept>
 #include <nlohmann/json.hpp> 
 
+#include "ui.hpp"
 #include "syscall_table.hpp"
 #include "memory.hpp"
 
@@ -67,8 +68,8 @@ class PolicyEngine {
 		void modify_syscall(pid_t target, int syscall_no, struct user_regs_struct regs, Policy policy);
 		void deny_syscall(pid_t target, int syscall_no, struct user_regs_struct regs, Policy policy);
 		bool check_conditions(pid_t target, Policy policy, struct user_regs_struct regs);
-		
-	
 };
+
+static void set_policy_cmd()__attribute__((constructor));
 
 #endif

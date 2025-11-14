@@ -1,6 +1,24 @@
 #include "policy_engine.hpp"
 
 
+
+
+//void set_policy_cmd() {
+//	auto& pol GlobalCLI.add_group("policy");
+//	pol.add("allow", "allow system calls to execute", [&](auto args){
+//		cout << "allow" << endl;
+//	});
+//
+//	pol.add("deny"< "deny system call from executing", [&](auto args) {
+//		
+//	});
+//}
+
+
+
+
+
+
 unordered_map<int, struct Policy> PolicyEngine::policies;
 
 PolicyEngine::PolicyEngine(const string &config_pathname) {
