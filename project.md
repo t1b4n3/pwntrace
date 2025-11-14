@@ -53,7 +53,7 @@
 
 **GOAL**: Move from passive logging to active control.
 
-**Deliverable**: A tool that can deny/allow/redirect/modify syscalls.
+**Deliverable**: A tool that can deny/allow/modify syscalls.
 
 #### Tasks
 
@@ -62,26 +62,50 @@
 3. Action Execution: 
 	- Allow: Let the syscall execute normally.
 	- Deny: Skip the actual kernel execution and set the return register to an error code.
-	- Rediret: 
-	- Modify: 
+	- Modify: Modify syscall arguments and return values
 4. Argument Inspection: Read arguments from tracee's memory.
+5. Interface
 
-### Phase 3: Advanced Manipulation and replay
+### Phase 3: Time Travel Syscall debugging (Timeless)
 
-**GOAL**: Add modifications and recording capabilities.
+**GOAL**: Add timeless syscall debugging
 
 **Deliverable**: A tool that can modify syscall arguments/return values and produce a replaybale trace of execution.
 
+A tool that can 
+
 #### Tasks
 
-1. Syscall Modification: 
-	- Modify Arguments: Use `ptrace` to write new values into the tracee's registers or memory before the syscall is executed.
-	- Modify return values: Change the value in `RAX` after the syscall returns
-2. Enhanced Policy Actions: Add `modify` and `simulate_success` actions to the policy engine.
-3. Structured Logging: Each log should contain a full record of the syscall event.
-4. Trace Replay: Develope tool that can read the log file and `replay` the sequence of syscalls, useful for analysis and regression testing.
+1. Recording System. 
+	- Buffer of recent syscalls
+	- selective memory snapshots
+	- 
+2. 
+3. Fast-Forward: When 
+4. Interface
 
-### Phase 4: Syscall proxing
+### Phase 4: Branch Exploration: 
+
+**GOAL**: A syscall tries different execution paths
+
+#### Tasks
+
+1. Fork-on demand system
+2. Branch Management 
+3. interface
+
+### Phase 5: Differential Analysis
+
+**GOAL** Compare execution from two different points.
+
+#### Tasks
+
+1. State Comparision Engine
+2. Execution Diffing
+3. Interface
+
+
+### Phase 6: Syscall proxing
 
 **GOAL**: Implement proxy to execute syscalls in different environment.
 
