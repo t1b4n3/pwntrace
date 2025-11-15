@@ -16,14 +16,17 @@
 #include <variant>
 #include <optional>
 #include <stdexcept>
+#include <nlohmann/json.hpp>
 
 #include "./syscall_table.hpp"
 #include "./memory.hpp"
 #include "./tracer.hpp"
 #include "./ui.hpp"
 #include "./logging.hpp"
+#include "./policy_engine.hpp"
 
 using namespace std;
+using namespace nlohmann;
 
 pid_t pid = -1;
 string pathname;
@@ -39,6 +42,8 @@ static void help() {
 bool is_config_loaded() {
 	return !config_path.empty();
 }
+
+
 
 void add_commands() {
 	pid_t pid = -1;
@@ -61,6 +66,7 @@ void add_commands() {
 			return;
 		}
 		config_path = tmp;
+		PolicyEngine engine(config_path);
 	});
 
 	add.add("pid", "attach to a running pid", [&](auto args){
