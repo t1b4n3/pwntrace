@@ -17,13 +17,14 @@
 
 
 
-
+int PolicyEngine::count;
 
 unordered_map<int, struct Policy> PolicyEngine::policies;
 
 PolicyEngine::PolicyEngine(const string &config_pathname) {
 	config_path = config_pathname;
 	load_policies_from_json(config_path);
+	add_commands();
 }
 
 
@@ -44,6 +45,7 @@ void PolicyEngine::load_policies_from_json(const string &path) {
     	ifstream file(path);
     	json j;
     	file >> j;
+	count = 0;
 
 	SyscallTable table;
 
@@ -85,6 +87,7 @@ void PolicyEngine::load_policies_from_json(const string &path) {
 			}
 			}
     	    	policies[p.syscall_no] = p;
+		count++;
     	}
 }
 
@@ -203,3 +206,273 @@ void PolicyEngine::modify_syscall(pid_t target, int syscall_no, struct user_regs
 
 }
 
+void PolicyEngine::create_policy() {
+	Policy p;
+	p.id = count;
+    	cout << "=== Add New Policy ===\n";
+
+    	// syscall
+    	cout << "Enter syscall: ";
+    	cin >> p.syscall;
+
+    	// action
+	string action;
+    	cout << "Action (allow/deny/modify): ";
+    	cin >> action;
+	
+	if (action == "allow") {
+		p.action = ACTION_TYPE::ALLOW;
+	} else if (action == "deny") {
+		p.action = ACTION_TYPE::DENY;
+	} else if (action == "modify") {
+		p.action = ACTION_TYPE::MODIFY;
+	}
+    	// enabled
+    	cout << "Enable this policy? (1=yes, 0=no): ";
+    	cin >> p.enabled;
+
+    	// use conditions?
+    	cout << "Use conditions? (1=yes, 0=no): ";
+    	cin >> p.use_conditions;
+
+    	if (p.use_conditions) {
+
+        	cout << "Condition argument (arg1/arg2/arg3/arg4): ";
+        	cin >> p.conditions.field;
+
+        	cout << "Operator (equals/greater/less/contains): ";
+        	cin >> p.conditions.operator_;
+
+        	cout << "Condition value (int or string): ";
+        	string raw;
+        	cin >> raw;
+        	// detect int or string
+        	try {
+        	    	int v = stoi(raw);
+        	    	p.conditions.value = v;
+        	} catch (...) {
+        	    	p.conditions.value = raw;
+        	}
+    	}
+
+    	// modify arguments only if modify
+    	if (p.action == ACTION_TYPE::MODIFY) {
+    	    auto ask_arg = [&](const string &name) -> variant<int, string> {
+    	        cout << name << " (value or -1 to skip): ";
+    	        string input;
+    	        cin >> input;
+
+    	        try {
+    	            return stoi(input);
+    	        } catch (...) {
+    	            return input;
+    	        }
+    	    };
+
+    	    p.arguments.push_back(ask_arg("arg1"));
+    	    p.arguments.push_back(ask_arg("arg2"));
+    	    p.arguments.push_back(ask_arg("arg3"));
+    	    p.arguments.push_back(ask_arg("arg4"));
+    	}
+
+	json j;
+	j["id"] = p.id;
+	j["syscall"] = p.syscall;
+	j["enabled"] = p.enabled;
+	if (p.use_conditions) {
+		j["use_conditions"] = true;
+		j["conditions"] = json::array();
+
+		json cond;
+		cond["value"] = variant_to_json(p.conditions.value);
+		cond["operator"] = p.conditions.operator_;
+		cond["field"] = p.conditions.field;
+		j["conditions"].push_back(cond);
+	} else {
+		j["use_conditions"] = false;
+	}
+
+	if (p.action == ACTION_TYPE::MODIFY) {
+		j["arguments"]["arg1"] = variant_to_json(p.arguments[0]);
+		j["arguments"]["arg2"] = variant_to_json(p.arguments[1]);
+		j["arguments"]["arg3"] = variant_to_json(p.arguments[2]);
+		j["arguments"]["arg4"] = variant_to_json(p.arguments[3]);
+	}
+
+	ofstream outfile(config_path);
+	outfile << j.dump(4);
+	cout << "\nPolicy saved to " << config_path << "\n";
+
+}
+
+json PolicyEngine::variant_to_json(const variant<int, string> &v) {
+    	if (holds_alternative<int>(v))
+    		return get<int>(v);
+    	return get<string>(v);
+}
+
+string PolicyEngine::variant_to_string(const variant<int, string>& v) {
+    if (holds_alternative<int>(v))
+        return to_string(get<int>(v));
+
+    return get<string>(v);
+}
+
+
+
+void PolicyEngine::add_commands() {
+	auto& policy = GlobalCLI.add_group("policy");
+
+	policy.add("add", "Add new policy", [&](auto args) {
+		create_policy();
+	});
+
+	policy.add("list","View all policies",  [&](auto args){
+		list_policies();
+	});
+
+	policy.add("delete", "delete policy", [&](auto args){
+		remove_policy();
+	});
+
+	policy.add("edit", "edit policy", [&](auto args){
+		edit_policy();
+	});
+	
+}
+
+void PolicyEngine::list_policies() {
+	 cout << "\n=== Existing Policies ===\n";
+
+    	if (policies.empty()) {
+    	    	cout << "No policies found.\n";
+    	    	return;
+    	}
+	
+	for (const auto &entry : policies) {
+		const Policy &p = entry.second;
+		cout << "ID: " << p.id << endl 
+		<< "Syscall Name: " << p.syscall << endl
+		<< "Syscall No: " << p.syscall_no << endl
+		<< "Action: " << p.action << endl
+		<< "Enabled: " << (p.enabled ? "true" : "false") << endl;
+
+		if (p.use_conditions) {
+			if (p.action == ACTION_TYPE::MODIFY) {
+				cout << "Arguments:";
+            			cout << "\n        arg1 = " << variant_to_string(p.arguments[0]);
+            			cout << "\n        arg2 = " << variant_to_string(p.arguments[1]);
+            			cout << "\n        arg3 = " << variant_to_string(p.arguments[2]);
+            			cout << "\n        arg4 = " << variant_to_string(p.arguments[3]);
+			}
+
+			cout << "Condtions: ";
+			cout << "\n	[" << p.conditions.field << " "
+			<< p.conditions.operator_ << " " << variant_to_string(p.conditions.value) << "]" << endl;
+
+		}
+	}
+}
+
+void PolicyEngine::remove_policy() {
+	cout << "Enter ID to delete: ";
+	int id; cin >> id;
+
+	count--;
+}
+
+void PolicyEngine::edit_policy() {
+	Policy p;
+    	cout << "=== Add New Policy ===\n";
+
+    	// syscall
+    	cout << "Enter syscall: ";
+    	cin >> p.syscall;
+
+    	// action
+	string action;
+    	cout << "Action (allow/deny/modify): ";
+    	cin >> action;
+	
+	if (action == "allow") {
+		p.action = ACTION_TYPE::ALLOW;
+	} else if (action == "deny") {
+		p.action = ACTION_TYPE::DENY;
+	} else if (action == "modify") {
+		p.action = ACTION_TYPE::MODIFY;
+	}
+    	// enabled
+    	cout << "Enable this policy? (1=yes, 0=no): ";
+    	cin >> p.enabled;
+
+    	// use conditions?
+    	cout << "Use conditions? (1=yes, 0=no): ";
+    	cin >> p.use_conditions;
+
+    	if (p.use_conditions) {
+
+        	cout << "Condition argument (arg1/arg2/arg3/arg4): ";
+        	cin >> p.conditions.field;
+
+        	cout << "Operator (equals/greater/less/contains): ";
+        	cin >> p.conditions.operator_;
+
+        	cout << "Condition value (int or string): ";
+        	string raw;
+        	cin >> raw;
+        	// detect int or string
+        	try {
+        	    	int v = stoi(raw);
+        	    	p.conditions.value = v;
+        	} catch (...) {
+        	    	p.conditions.value = raw;
+        	}
+    	}
+
+    	// modify arguments only if modify
+    	if (p.action == ACTION_TYPE::MODIFY) {
+    	    auto ask_arg = [&](const string &name) -> variant<int, string> {
+    	        cout << name << " (value or -1 to skip): ";
+    	        string input;
+    	        cin >> input;
+
+    	        try {
+    	            return stoi(input);
+    	        } catch (...) {
+    	            return input;
+    	        }
+    	    };
+
+    	    p.arguments.push_back(ask_arg("arg1"));
+    	    p.arguments.push_back(ask_arg("arg2"));
+    	    p.arguments.push_back(ask_arg("arg3"));
+    	    p.arguments.push_back(ask_arg("arg4"));
+    	}
+
+	json j;
+	j["id"] = p.id;
+	j["syscall"] = p.syscall;
+	j["enabled"] = p.enabled;
+	if (p.use_conditions) {
+		j["use_conditions"] = true;
+		j["conditions"] = json::array();
+
+
+		j["conditions"]["value"] = variant_to_json(p.conditions.value);
+		j["conditions"]["operator"] = p.conditions.operator_;
+		j["conditions"]["field"] = p.conditions.field;
+	} else {
+		j["use_conditions"] = false;
+	}
+
+	if (p.action == ACTION_TYPE::MODIFY) {
+		j["arguments"]["arg1"] = variant_to_json(p.arguments[0]);
+		j["arguments"]["arg2"] = variant_to_json(p.arguments[1]);
+		j["arguments"]["arg3"] = variant_to_json(p.arguments[2]);
+		j["arguments"]["arg4"] = variant_to_json(p.arguments[3]);
+	}
+
+	ofstream outfile(config_path);
+	outfile << j.dump(4);
+	cout << "\nPolicy saved to " << config_path << "\n";
+}

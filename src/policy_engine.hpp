@@ -50,26 +50,37 @@ struct Policy {
 	int stub_return = 0;
 };
 
+
+
+
 class PolicyEngine {
 	private:
+		static int count;
 		static unordered_map<int, struct Policy> policies; // key = id, value = struct
 		string config_path;
 		static ACTION_TYPE compile_handler(struct Policy policy);
 		ACTION_TYPE parse_action(const string &action_str);
 		void load_policies_from_json(const string &path);
-		 
+		
+		static string variant_to_string(const variant<int, string>& v);
 	public:
 		PolicyEngine(const string &config_pathname); // compile policies and store in policies hashmap
 		Policy evaluate(int syscall_no);
 		void reload();
 		bool should_trace(int syscall_no);  // determin if we should bother evaluting this syscall
-	
 		//Action executions
 		void modify_syscall(pid_t target, int syscall_no, struct user_regs_struct regs, Policy policy);
 		void deny_syscall(pid_t target, int syscall_no, struct user_regs_struct regs, Policy policy);
 		bool check_conditions(pid_t target, Policy policy, struct user_regs_struct regs);
+		
+		json variant_to_json(const variant<int, string> &v);
+		void add_commands();
+		void create_policy();
+		void list_policies();
+		void remove_policy();
+		void edit_policy();
+		json policy_to_json(Policy p);
 };
 
-static void set_policy_cmd()__attribute__((constructor));
 
 #endif
