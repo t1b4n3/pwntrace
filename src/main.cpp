@@ -30,7 +30,6 @@ using namespace nlohmann;
 
 pid_t pid = -1;
 string pathname;
-string config_path;
 string program_name;
 
 static void help() {
@@ -40,19 +39,23 @@ static void help() {
 }
 
 bool is_config_loaded() {
-	return !config_path.empty();
+	return !policy_config.empty();
 }
-
 
 
 void add_commands() {
 	pid_t pid = -1;
+	PolicyEngine engine;
 	auto& run = GlobalCLI.add_group("run");
 	auto& add = GlobalCLI.add_group("add");
 	auto& hp = GlobalCLI.add_group("help");
 
-	hp.add("_defualt", "help", [&](auto args){
+	hp.add("_default", "help", [&](auto args){
 		help();
+	});
+
+	add.add("_default", "add", [&](auto args){
+		cout << "Defualt";
 	});
 
 	add.add("policy", "policy file", [&](auto args){
@@ -65,8 +68,7 @@ void add_commands() {
 			cout << "[-] File no found || Permissions denied\n";
 			return;
 		}
-		config_path = tmp;
-		PolicyEngine engine(config_path);
+		policy_config = tmp;
 	});
 
 	add.add("pid", "attach to a running pid", [&](auto args){
@@ -100,12 +102,12 @@ void add_commands() {
 
 
 
-	run.add("_defualt", "run", [&](auto args){
+	run.add("_default", "run", [&](auto args){
 		if (pathname.empty() || pid == -1) {
 			cout << "[-] add binary or attach to running process first" << endl;
 			return;
 		}
-		tracer(pid, pathname, config_path);
+		tracer(pid, pathname);
 	});
 
 	run.add("pid", "attach to a running pid", [&](auto args){
@@ -123,7 +125,7 @@ void add_commands() {
 			cout << "[-] load policy file first" << endl;
 			return;
 		}
-		tracer(pid, pathname, config_path);
+		tracer(pid, pathname);
 	});
 
 	run.add("bin", "start a new process", [&](auto args){
@@ -140,11 +142,13 @@ void add_commands() {
 			cout << "[-] load policy file first" << endl;
 			return;
 		}
-		tracer(pid, pathname, config_path);
+		tracer(pid, pathname);
 	});
 }
 
 int main(int argc, char* argv[]) {
+	policy_config = "./pwntrace.json";
+	policy_engine.load_policies_from_json();
 	program_name = argv[0];
 	add_commands();
 	GlobalCLI.cli();	
