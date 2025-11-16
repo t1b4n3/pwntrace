@@ -21,19 +21,24 @@ void CLI::parse_and_execute(const string& line) {
 	string groupName, cmdName;
 	iss >> groupName >> cmdName;
 
+	auto it = groups.find(groupName);
+	if (it == groups.end()) {
+		cout << "[-] Unknown Group: " << groupName << endl;
+		return;
+	} 
+
+	if (cmdName.empty()) {
+		cmdName = "_defualt";
+	}
+
 	if (groupName.empty()) return;
 
 	vector<string> args;
 	string token;
 	while (iss >> token) args.push_back(token);
 
-	if (cmdName.empty()) cmdName = "_defualt";
 
-	auto it = groups.find(groupName);
-	if (it == groups.end()) {
-		cout << "[-] Unknown Group: " << groupName << endl;
-		return;
-	}
+
 
 	if (!it->second.execute(cmdName, args)) {
 		cout << "[-] Unkown Command: " << cmdName << " in group " << groupName << endl;
