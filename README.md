@@ -1,7 +1,8 @@
-# Syscall proxing framework
+# PWNTRACE
 
-Intercepts syscalls in userspace to emulate remote environment / sandbox syscalss.
-It allows security researchers to monitor, modify, and control system calls made by applications in real-time, enabling analysis of malware behavior, testing exploits in controlled environments and understanding program interactions with the operating system
+pwntrace is syscall debugging tool. 
+
+Intercepts syscalls in userspace and it allows security researchers to monitor, modify, and control system calls made by applications in real-time, enabling analysis of malware behavior, testing exploits in controlled environments and understanding program interactions with the operating system
 
 What it does:
 - intercepts selected syscalls of a target process and logs and/or forwards them to a proxy.
