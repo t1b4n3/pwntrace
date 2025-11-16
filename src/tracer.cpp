@@ -23,11 +23,12 @@ void print_syscall(SYSCALL sys, pid_t target, PolicyEngine policy_engine) {
                 	(unsigned long long)regs.r9);
 		
 		if (regs.orig_rax == 0) {
-			printf("[+] Syscall %llu - %s Enter Data : 0x%llx -> ", 
+			printf("[+] Syscall %llu - %s\nEnter Data : 0x%llx -> ", 
 				regs.orig_rax, table.get_syscall_name(regs.orig_rax).c_str(), regs.rsi);
 		} else if (regs.orig_rax == 1) {
-			printf("[+] Syscall %llu - %s\nWrote Data : 0x%llx -> %s\n",
-			regs.orig_rax, table.get_syscall_name(regs.orig_rax).c_str(), regs.rsi, 
+			printf("[+] Syscall %llu - %s\n( rdi=0x%llx rsi=0x%llx rdx=0x%llx )\nWrote Data : 0x%llx -> %s\n",
+			regs.orig_rax, table.get_syscall_name(regs.orig_rax).c_str(), 
+			regs.rdi, regs.rsi, regs.rdx, regs.rsi, 
 			read_mem.read_string(target, regs.rsi).c_str());
 		} else if (regs.orig_rax == 2) {
 			printf("[+] Syscall %llu - %s\nOpening : %s Flags : %d",
@@ -89,9 +90,8 @@ void print_syscall(SYSCALL sys, pid_t target, PolicyEngine policy_engine) {
 }
 
 
-void tracer(pid_t pid, string pathname, string config_path) {
+void tracer(pid_t pid, string pathname) {
 	log_message(LOG_INFO, "Pwntrace");
-	PolicyEngine policy_engine(config_path);
 	SyscallTable table;
 
 
@@ -159,8 +159,6 @@ void tracer(pid_t pid, string pathname, string config_path) {
 	// Print initial regsiters
 	if (ptrace(PTRACE_GETREGS, target, NULL, &regs) == -1) {
 		log_message(LOG_WARN, "PTRACE_GETREGS failed: %s", strerror(errno));
-	} else {
-		// print regs
 	}
 
 	// set options to help detect syscall stops

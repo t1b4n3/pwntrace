@@ -38,7 +38,7 @@ typedef enum {
 
 void print_syscall(SYSCALL sys, pid_t target, PolicyEngine policy_engine);
 
-void tracer(pid_t pid, string pathname, string config_path);
+void tracer(pid_t pid, string pathname);
 
 
 #endif
