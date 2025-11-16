@@ -17,9 +17,11 @@
 #include "syscall_table.hpp"
 #include "memory.hpp"
 
+#pragma once
 
 using namespace std;
 using namespace nlohmann;
+
 
 typedef enum {
 	ALLOW,
@@ -50,21 +52,17 @@ struct Policy {
 	int stub_return = 0;
 };
 
-
-
-
 class PolicyEngine {
 	private:
 		static int count;
 		static unordered_map<int, struct Policy> policies; // key = id, value = struct
-		string config_path;
 		static ACTION_TYPE compile_handler(struct Policy policy);
 		ACTION_TYPE parse_action(const string &action_str);
-		void load_policies_from_json(const string &path);
 		
 		static string variant_to_string(const variant<int, string>& v);
 	public:
-		PolicyEngine(const string &config_pathname); // compile policies and store in policies hashmap
+		void load_policies_from_json();
+		PolicyEngine(); // compile policies and store in policies hashmap
 		Policy evaluate(int syscall_no);
 		void reload();
 		bool should_trace(int syscall_no);  // determin if we should bother evaluting this syscall
@@ -81,6 +79,10 @@ class PolicyEngine {
 		void edit_policy();
 		json policy_to_json(Policy p);
 };
+
+extern string policy_config;
+extern PolicyEngine policy_engine;
+
 
 
 #endif

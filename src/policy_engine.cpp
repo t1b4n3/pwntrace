@@ -15,15 +15,14 @@
 //}
 
 
-
+string policy_config;
+PolicyEngine policy_engine;
 
 int PolicyEngine::count;
 
 unordered_map<int, struct Policy> PolicyEngine::policies;
 
-PolicyEngine::PolicyEngine(const string &config_pathname) {
-	config_path = config_pathname;
-	load_policies_from_json(config_path);
+PolicyEngine::PolicyEngine() {
 	add_commands();
 }
 
@@ -38,11 +37,16 @@ ACTION_TYPE PolicyEngine::parse_action(const string &action_str) {
 
 void PolicyEngine::reload() {
     	policies.clear();
-    	load_policies_from_json(config_path);
+    	load_policies_from_json();
 }
 
-void PolicyEngine::load_policies_from_json(const string &path) {
-    	ifstream file(path);
+void PolicyEngine::load_policies_from_json() {
+    	string path = policy_config;
+	ifstream file(path);
+	if (!file.is_open()) {
+		cerr << "[-] Could not open config file: " << policy_config << endl;
+		return;
+	}
     	json j;
     	file >> j;
 	count = 0;
@@ -54,10 +58,10 @@ void PolicyEngine::load_policies_from_json(const string &path) {
     	    	p.id = item["id"];
     	    	p.syscall = item["syscall"];
     	    	p.syscall_no = table.get_syscall_no(item["syscall"]);
-    	    	p.action = parse_action(item["action"]);
+    	    	p.action = parse_action(item.value("action", "allow"));
     	    	p.enabled = item.value("enabled", true);
     	    	p.stub_return = item.value("stub_return", 0);
-		
+		count++;
 		if (item.contains("arguments")) {
 			for (auto &arg : item["arguments"]) {
 				for (auto &kv : arg.items()) {	
@@ -79,7 +83,7 @@ void PolicyEngine::load_policies_from_json(const string &path) {
 			p.conditions.operator_ = cond["operator"];
 				
 			if (cond["value"].is_string()) {
-				p.conditions.value = cond["value"].get<std::string>();
+				p.conditions.value = cond["value"].get<string>();
 			} else if (cond["value"].is_number_integer()) {
 				p.conditions.value = cond["value"].get<int>();
 			} else {
@@ -87,13 +91,14 @@ void PolicyEngine::load_policies_from_json(const string &path) {
 			}
 			}
     	    	policies[p.syscall_no] = p;
-		count++;
+		
     	}
 }
 
 bool PolicyEngine::should_trace(int syscall_no) {
     static const unordered_set<int> skip = {
-        9, 12, 39, 104, 105, 106, 107, 108, 108, 110, 112, 113, 114, 231, 238, 262, 334, 273, 10, 158, 318, 302, 218, 17, 11
+        //9, 12, 39, 104, 105, 106, 107, 108, 108, 110, 112, 113, 114, 231, 238, 262, 334, 273, 10, 158, 318, 302, 218, 17, 11
+	
     };
     return skip.find(syscall_no) == skip.end();
 }
@@ -208,7 +213,7 @@ void PolicyEngine::modify_syscall(pid_t target, int syscall_no, struct user_regs
 
 void PolicyEngine::create_policy() {
 	Policy p;
-	p.id = count;
+	p.id = ++count;
     	cout << "=== Add New Policy ===\n";
 
     	// syscall
@@ -230,6 +235,7 @@ void PolicyEngine::create_policy() {
     	// enabled
     	cout << "Enable this policy? (1=yes, 0=no): ";
     	cin >> p.enabled;
+	
 
     	// use conditions?
     	cout << "Use conditions? (1=yes, 0=no): ";
@@ -275,34 +281,65 @@ void PolicyEngine::create_policy() {
     	    p.arguments.push_back(ask_arg("arg4"));
     	}
 
-	json j;
-	j["id"] = p.id;
-	j["syscall"] = p.syscall;
-	j["enabled"] = p.enabled;
-	if (p.use_conditions) {
-		j["use_conditions"] = true;
-		j["conditions"] = json::array();
+	json old_policy;
 
-		json cond;
-		cond["value"] = variant_to_json(p.conditions.value);
-		cond["operator"] = p.conditions.operator_;
-		cond["field"] = p.conditions.field;
-		j["conditions"].push_back(cond);
+	// --- Load existing file ---
+	{
+	    	ifstream infile(policy_config);
+		
+	    	if (!infile.is_open()) {
+	    	    old_policy = json::array();     // create empty list
+	    	} else {
+	    	    infile >> old_policy;
+	    	}
+	}
+
+	// --- Ensure it's an array ---
+	if (!old_policy.is_array()) {
+	    // Convert object/single-policy into array
+	    	json tmp = json::array();
+	    	tmp.push_back(old_policy);
+	    	old_policy = tmp;
+	}
+
+
+	// --- Create new policy ---
+	json pjson;
+	pjson["id"] = p.id;
+	pjson["syscall"] = p.syscall;
+	pjson["enabled"] = p.enabled;
+	pjson["action"] = action;
+
+	if (p.use_conditions) {
+	    	json cond;
+	    	cond["value"] = variant_to_json(p.conditions.value);
+	    	cond["operator"] = p.conditions.operator_;
+	    	cond["field"] = p.conditions.field;
+
+	    	pjson["use_conditions"] = true;
+	    	pjson["conditions"] = json::array({ cond });
 	} else {
-		j["use_conditions"] = false;
+	    	pjson["use_conditions"] = false;
 	}
 
 	if (p.action == ACTION_TYPE::MODIFY) {
-		j["arguments"]["arg1"] = variant_to_json(p.arguments[0]);
-		j["arguments"]["arg2"] = variant_to_json(p.arguments[1]);
-		j["arguments"]["arg3"] = variant_to_json(p.arguments[2]);
-		j["arguments"]["arg4"] = variant_to_json(p.arguments[3]);
+	    	pjson["arguments"] = {
+	    	    	{"arg1", variant_to_json(p.arguments[0])},
+	    	    	{"arg2", variant_to_json(p.arguments[1])},
+	    	    	{"arg3", variant_to_json(p.arguments[2])},
+	    	    	{"arg4", variant_to_json(p.arguments[3])}
+	    	};
+	}
+	// --- Append new entry ---
+	old_policy.push_back(pjson);
+
+	// --- Save file (overwrite with updated array) ---
+	{
+	    	ofstream outfile(policy_config, std::ios::trunc);
+	    	outfile << old_policy.dump(4);
 	}
 
-	ofstream outfile(config_path);
-	outfile << j.dump(4);
-	cout << "\nPolicy saved to " << config_path << "\n";
-
+	count++;
 }
 
 json PolicyEngine::variant_to_json(const variant<int, string> &v) {
@@ -472,7 +509,7 @@ void PolicyEngine::edit_policy() {
 		j["arguments"]["arg4"] = variant_to_json(p.arguments[3]);
 	}
 
-	ofstream outfile(config_path);
+	ofstream outfile(policy_config);
 	outfile << j.dump(4);
-	cout << "\nPolicy saved to " << config_path << "\n";
+	cout << "\nPolicy saved to " << policy_config << "\n";
 }
