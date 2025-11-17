@@ -35,7 +35,7 @@ class CommandGroup {
 
 class CLI {
 	private:
-		unordered_map<string, CommandGroup> groups;
+		static unordered_map<string, CommandGroup> groups;
 		static char *cmd_generator(const char* text, int state);
 		static char **cli_completion(const char* text, int start, int end);
 		static string expand_home(const string& path);

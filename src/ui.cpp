@@ -3,6 +3,7 @@
 CLI GlobalCLI; 
 
 unordered_map<string, Command> CommandGroup::commands;
+unordered_map<string, CommandGroup> CLI::groups;
 
 void CommandGroup::add(const string cmd, const string desc, 
 	function<void(const vector<string>&)> fn) {
@@ -120,18 +121,3 @@ string CLI::expand_home(const string& path) {
     	return path;
 }
 
-
-
-
-/*
-USAGE
-
-CLI cli;
-
-auto& groupName = cli.add_group("groupName");
-groupName.add("cmd", "descritipn", [&](auto args){
-	fn();
-});
-
-
-*/
