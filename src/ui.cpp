@@ -48,12 +48,15 @@ void CLI::parse_and_execute(const string& line) {
 }
 
 CommandGroup& CLI::add_group(const string& name) {
-	auto it = groups.find(name);
-	if (it == groups.end()) {
-		auto inserted = groups.emplace(name,CommandGroup(name));
-		return inserted.first->second;
-	}
-	return it->second;
+	//auto it = groups.find(name);
+	//if (it == groups.end()) {
+	//	auto inserted = groups.emplace(name,CommandGroup(name));
+	//	return inserted.first->second;
+	//}
+	//return it->second;
+    	auto [it, inserted] = groups.try_emplace(name, name);
+    	return it->second;
+
 }
 
 void CLI::cli() {
