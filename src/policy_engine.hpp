@@ -49,7 +49,7 @@ struct Policy {
 	bool use_conditions;
 	Conditions conditions;
 	vector<variant<int, string>> arguments;
-	int stub_return = 0;
+	long stub_return = 0;
 };
 
 class PolicyEngine {
