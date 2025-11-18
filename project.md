@@ -105,7 +105,12 @@ A tool that can
 3. Interface
 
 
-### Phase 6: Syscall proxing
+### Phase 6: Add scripting capabilities
+
+**Goal** add python scripting capabilities that 
+
+
+### Phase 7: Syscall proxing
 
 **GOAL**: Implement proxy to execute syscalls in different environment.
 
