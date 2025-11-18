@@ -23,8 +23,8 @@ void print_syscall(SYSCALL sys, pid_t target, PolicyEngine policy_engine) {
                 	(unsigned long long)regs.r9);
 		
 		if (regs.orig_rax == 0) {
-			printf("[+] Syscall %llu - %s\nEnter Data : 0x%llx -> ", 
-				regs.orig_rax, table.get_syscall_name(regs.orig_rax).c_str(), regs.rsi);
+			printf("[+] Syscall %llu - %s\n(0x%llx) Enter Data : 0x%llx -> ", 
+				regs.orig_rax, table.get_syscall_name(regs.orig_rax).c_str(), regs.rdi, regs.rsi);
 		} else if (regs.orig_rax == 1) {
 			printf("[+] Syscall %llu - %s\n( rdi=0x%llx rsi=0x%llx rdx=0x%llx )\nWrote Data : 0x%llx -> %s\n",
 			regs.orig_rax, table.get_syscall_name(regs.orig_rax).c_str(), 
@@ -36,7 +36,7 @@ void print_syscall(SYSCALL sys, pid_t target, PolicyEngine policy_engine) {
 				read_mem.read_string(target, regs.rsi, 256), regs.rdx
 				);
 		} else if (regs.orig_rax == 3) {
-			printf("[+] Syscall %llu - %s\nClosing : %d\n",
+			printf("[+] Syscall %llu - %s\nClosing : 0x%llx\n",
 				regs.orig_rax, table.get_syscall_name(regs.orig_rax).c_str(), 
 				regs.rax
 				);
@@ -151,11 +151,11 @@ void tracer(pid_t pid, string pathname) {
 				log_message(LOG_ERROR, "PTRACE_GETREGS failed");
 				exit(0);
 			}
-
 			log_message(LOG_INFO, "Launched child stopped (status=0x%x)", status);
 		}
 	} 	
 
+	
 	// Print initial regsiters
 	if (ptrace(PTRACE_GETREGS, target, NULL, &regs) == -1) {
 		log_message(LOG_WARN, "PTRACE_GETREGS failed: %s", strerror(errno));
