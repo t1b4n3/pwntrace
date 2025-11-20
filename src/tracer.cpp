@@ -1,5 +1,7 @@
 #include "./tracer.hpp"
 
+#include "./print_syscall.hpp"
+
 struct user_regs_struct regs;
 
 void print_syscall(SYSCALL sys, pid_t target, PolicyEngine policy_engine) {
@@ -7,11 +9,13 @@ void print_syscall(SYSCALL sys, pid_t target, PolicyEngine policy_engine) {
 	SyscallTable table;
 	string syscall_name;
 	string data;
+	PrintSyscall pt;
+	pt.update(regs, target);
 
 #if defined(__x86_64__)
 	if (!policy_engine.should_trace(regs.orig_rax)) return;
 	if (sys == SYSCALL_ENTRY) {
-		cout << endl;
+		//cout << endl;
 		log_message(LOG_RESULT, "PID %d SYSCALL entry: num=%llu args=(0x%llx,0x%llx,0x%llx,0x%llx,0x%llx,0x%llx)",
                 	target,
                 	(unsigned long long)regs.orig_rax,
@@ -22,30 +26,18 @@ void print_syscall(SYSCALL sys, pid_t target, PolicyEngine policy_engine) {
                 	(unsigned long long)regs.r8,
                 	(unsigned long long)regs.r9);
 		
-		if (regs.orig_rax == 0) {
-			printf("[+] Syscall %llu - %s\n(0x%llx) Enter Data : 0x%llx -> ", 
-				regs.orig_rax, table.get_syscall_name(regs.orig_rax).c_str(), regs.rdi, regs.rsi);
-		} else if (regs.orig_rax == 1) {
-			printf("[+] Syscall %llu - %s\n( rdi=0x%llx rsi=0x%llx rdx=0x%llx )\nWrote Data : 0x%llx -> %s\n",
-			regs.orig_rax, table.get_syscall_name(regs.orig_rax).c_str(), 
-			regs.rdi, regs.rsi, regs.rdx, regs.rsi, 
-			read_mem.read_string(target, regs.rsi).c_str());
-		} else if (regs.orig_rax == 2) {
-			printf("[+] Syscall %llu - %s\nOpening : %s Flags : %d",
-				regs.orig_rax, table.get_syscall_name(regs.orig_rax).c_str(),
-				read_mem.read_string(target, regs.rsi, 256), regs.rdx
-				);
-		} else if (regs.orig_rax == 3) {
-			printf("[+] Syscall %llu - %s\nClosing : 0x%llx\n",
-				regs.orig_rax, table.get_syscall_name(regs.orig_rax).c_str(), 
-				regs.rax
-				);
-		}
-		else {
-			printf("[+] Syscall %llu - %s\n( rdi=0x%llx rsi=0x%llx rdx=0x%llx ) mem[%s]\n", 
-				regs.orig_rax, table.get_syscall_name(regs.orig_rax).c_str(), regs.rdi,
-				regs.rsi, regs.rdx, read_mem.read_string(target, regs.rsi, 256).c_str()
-			);	
+		switch (regs.orig_rax) {
+			case 0: pt.pread(); break;
+			case 1: pt.pwrite(); break;
+			case 2: pt.popen(); break;
+			case 3: pt.pclose(); break;
+			case 59: pt.pexecve(); break;
+			case 60: pt.pexit(); break;
+			default:
+				printf("%s(0x%llx, 0x%llx, 0x%llx)", 
+				table.get_syscall_name(regs.orig_rax).c_str(), 
+				regs.rdi, regs.rsi, regs.rdx);
+				break;
 		}
 	} else {
 		log_message(LOG_RESULT, "PID %d SYSCALL exit:  num=%llu => ret=0x%llx",
@@ -53,8 +45,8 @@ void print_syscall(SYSCALL sys, pid_t target, PolicyEngine policy_engine) {
         		(unsigned long long)regs.orig_rax,
         		(unsigned long long)regs.rax);
 
-		printf("[-] ret=0x%llx\n", regs.rax);
-
+		//printf("[-] ret=0x%llx\n", regs.rax);
+		pt.print_ret();
 	}	
 #elif defined(__i386__) // x86
 	if (!policy_engine.should_trace(regs.orig_eax)) return;
@@ -93,7 +85,6 @@ void print_syscall(SYSCALL sys, pid_t target, PolicyEngine policy_engine) {
 void tracer(pid_t pid, string pathname) {
 	log_message(LOG_INFO, "Pwntrace");
 	SyscallTable table;
-
 
 	int status;
 	pid_t target;

@@ -1,6 +1,8 @@
 #ifndef PRINT_SYSCALLS_H
 #define PRINT_SYSCALLS_H
 
+#include <iostream>
+#include <iomanip>
 #include <unistd.h>
 #include <sys/ptrace.h>
 #include <sys/user.h>
@@ -21,12 +23,14 @@ extern pid_t ptarget;
 
 class PrintSyscall {
 	public:
+		void print_ret();
 		void update(struct user_regs_struct REGS, pid_t pid);
 		void pwrite();
 		void pread();
 		void pclose();
 		void pexecve();
 		void popen();
+		void pexit();
 };
 
 
