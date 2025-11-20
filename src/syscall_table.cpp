@@ -1,7 +1,17 @@
 #include "syscall_table.hpp"
 
-unordered_map<int, string> SyscallTable::syscall_names;
-unordered_map<string, int> SyscallTable::syscall_nums;
+//unordered_map<int, string> SyscallTable::syscall_names;
+//unordered_map<string, int> SyscallTable::syscall_nums;
+
+static unordered_map<int,string>& syscall_names() {
+    static unordered_map<int,string> m;
+    return m;
+}
+
+static unordered_map<string,int>& syscall_nums() {
+    static unordered_map<string,int> m;
+    return m;
+}
 
 SyscallTable::SyscallTable() {
 	const char* possible_paths[] = {
@@ -24,13 +34,14 @@ SyscallTable::SyscallTable() {
 		if (file.is_open()) {
 			parse_header_file(possible_paths[i]);
 			file.close();
-			if (!syscall_names.empty()) return;
+			if (!syscall_names().empty()) return;
 		}
 	}
 
 }
 
 void SyscallTable::parse_header_file(const string& filename) {
+	int MAX_SYSCALL = 500;
 	ifstream file(filename);
 	if (!file.is_open()) return;
 	string line;
@@ -40,17 +51,22 @@ void SyscallTable::parse_header_file(const string& filename) {
 		if (regex_search(line, matches, pattern)) {
 			if (matches.size() == 3) {
 				string name = matches[1];
-				int number = stoi(matches[2]);
-				syscall_names[number] = name;
-				syscall_nums[name] = number;
+				//int number = stoi(matches[2]);
+				long long num_ll = stoll(matches[2]);
+				if (num_ll < 0 || num_ll > MAX_SYSCALL) {
+				    continue; // skip invalid syscall numbers
+				}
+				int number = static_cast<int>(num_ll);
+				syscall_names()[number] = name;
+				syscall_nums()[name] = number;
 			}
 		}
 	}
 }
 
 string SyscallTable::get_syscall_name(int syscall_num) {
-	auto it = syscall_names.find(syscall_num);
-	if (it != syscall_names.end()) {
+	auto it = syscall_names().find(syscall_num);
+	if (it != syscall_names().end()) {
 		return it->second;
 	} else if (syscall_num == -1) {
 		return "Syscall Denied : " + to_string(syscall_num); 
@@ -59,8 +75,8 @@ string SyscallTable::get_syscall_name(int syscall_num) {
 }
 
 int SyscallTable::get_syscall_no(string syscall_) {
-	auto it = syscall_nums.find(syscall_);
-	if (it != syscall_nums.end()) {
+	auto it = syscall_nums().find(syscall_);
+	if (it != syscall_nums().end()) {
 		return it->second;
 	}
 	return -1;

@@ -25,11 +25,11 @@ using namespace std;
 
 
 class SyscallTable {
-	private:
-		static unordered_map<int, string> syscall_names;
-		static unordered_map<string, int> syscall_nums;
-		
-
+	//private:
+	//	static unordered_map<int, string> syscall_names;
+	//	static unordered_map<string, int> syscall_nums;
+	//	
+	//
 	public:
 		SyscallTable();
 		string get_syscall_name(int syscall_num);
