@@ -13,20 +13,22 @@ bool is_user_address(uint64_t addr) {
 
 string ReadMemory::read_string(pid_t pid, uint64_t addr, size_t maxlen) {
 	string s;
-	if (!is_user_address(addr)) return s;
+	if (!is_user_address(addr)) return "NULL";
 
 	size_t read = 0;
 	errno = 0;
 	long word;
-
+	int count = 0;
 	while (read < maxlen) {
 		word = ptrace(PTRACE_PEEKDATA, pid, (void*)(addr + read), NULL);
 		if (word == -1 && errno != 0) break;
 		uint8_t *bytes = reinterpret_cast<uint8_t*>(&word);
 		for (size_t i = 0; i < sizeof(long) && read < maxlen; ++i, ++read) {
+			if (bytes[i] == 0 && count == 0) return "NULL";
 			if (bytes[i] == 0) return s;
 			s.push_back(static_cast<char>(bytes[i]));
 		}  
+		count++;
 	}
 	return s;
 }
