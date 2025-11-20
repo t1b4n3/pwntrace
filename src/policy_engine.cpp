@@ -128,20 +128,20 @@ bool PolicyEngine::check_conditions(pid_t target, Policy policy, struct user_reg
 	long actual_value = 0;
     
 	// check arg
-    	if (policy.conditions.field == "arg1") {
+    	if (policy.conditions.field == "rdi") {
 #if defined(__x86_64__)
         actual_value = regs.rdi;
 #elif defined(__i386__)
         actual_value = regs.ebx;
 #endif
-    	} else if (policy.conditions.field == "arg2") {
+    	} else if (policy.conditions.field == "rsi") {
 #if defined(__x86_64__)
         	actual_value = regs.rsi;
 #elif defined(__i386__)
         	actual_value = regs.ecx;
 #endif
     	}
-    else if (policy.conditions.field == "arg3") {
+    else if (policy.conditions.field == "rdx") {
 #if defined(__x86_64__)
 	        actual_value = regs.rdx;
 #elif defined(__i386__)
@@ -207,7 +207,11 @@ void PolicyEngine::modify_syscall(pid_t target, int syscall_no, struct user_regs
 		}
 	}
 	ptrace(PTRACE_SETREGS, target, nullptr, &regs);
-    	printf("[**] MODIFY: %d - %s\n", policy.syscall_no, policy.syscall.c_str());
+    	printf("[**] MODIFY: %d - %s\n(rdi=0x%llx rsi=0x%llx rdx=0x%llx) mem[(%s), (%s), (%s)]\n",
+		policy.syscall_no, policy.syscall.c_str(),
+		regs.rdi, regs.rsi, regs.rdx, read_mem.read_string(target, regs.rdi).c_str(),
+		read_mem.read_string(target, regs.rsi), read_mem.read_string(target, regs.rdx)
+		);
 
 }
 
