@@ -1,8 +1,5 @@
 #include "policy_engine.hpp"
 
-
-
-
 //void set_policy_cmd() {
 //	auto& pol GlobalCLI.add_group("policy");
 //	pol.add("allow", "allow system calls to execute", [&](auto args){
@@ -14,18 +11,14 @@
 //	});
 //}
 
-
 string policy_config;
 PolicyEngine policy_engine;
-
 int PolicyEngine::count;
-
 unordered_map<int, struct Policy> PolicyEngine::policies;
 
 PolicyEngine::PolicyEngine() {
 	add_commands();
 }
-
 
 ACTION_TYPE PolicyEngine::parse_action(const string &action_str) {
     	if (action_str == "allow") return ACTION_TYPE::ALLOW;
@@ -62,34 +55,42 @@ void PolicyEngine::load_policies_from_json() {
     	    	p.enabled = item.value("enabled", true);
     	    	p.stub_return = item.value("stub_return", 0);
 		count++;
-		if (item.contains("arguments")) {
-			for (auto &arg : item["arguments"]) {
-				for (auto &kv : arg.items()) {	
-					auto &key  = kv.key();
-					auto &value =kv.value(); 
-					if (value.is_string()) {
-						p.arguments.push_back(value.get<string>());
-					} else {
-						p.arguments.push_back(value.get<int>());
-					}
-				}
-					
-			}
-		}
-		if (item.contains("conditions") && !item["conditions"].empty()) {
-			auto &cond = item["conditions"][0];
-				
-			p.conditions.field = cond["field"];
-			p.conditions.operator_ = cond["operator"];
-				
-			if (cond["value"].is_string()) {
-				p.conditions.value = cond["value"].get<string>();
-			} else if (cond["value"].is_number_integer()) {
-				p.conditions.value = cond["value"].get<int>();
+		if (item.contains("arguments") && !item["arguments"].empty()) {
+
+			auto &arg = item["arguments"][0];
+			if (arg["rdi"].is_string()) {
+				p.args.rdi = arg["rdi"].get<string>();
+			} else if (arg["rdi"].is_number_integer()) {
+				p.args.rdi = arg["rdi"].get<long>();
 			} else {
-			    p.conditions.value = cond["value"].dump();
+				p.args.rdi = arg["rdi"].dump();
 			}
+
+			if (arg["rsi"].is_string()) {
+				p.args.rdi = arg["rsi"].get<string>();
+			} else if (arg["rsi"].is_number_integer()) {
+				p.args.rdi = arg["rsi"].get<long>();
+			} else {
+				p.args.rdi = arg["rsi"].dump();
 			}
+			if (arg["rdx"].is_string()) {
+				p.args.rdi = arg["rdx"].get<string>();
+			} else if (arg["rdx"].is_number_integer()) {
+				p.args.rdi = arg["rdx"].get<long>();
+			} else {
+				p.args.rdi = arg["rdx"].dump();
+			}
+			if (arg["r10"].is_string()) {
+				p.args.rdi = arg["r10"].get<string>();
+			} else if (arg["r10"].is_number_integer()) {
+				p.args.rdi = arg["r10"].get<long>();
+			} else {
+				p.args.rdi = arg["r10"].dump();
+			}
+			
+			
+		}
+
     	    	policies[p.syscall_no] = p;
 		
     	}
@@ -98,7 +99,6 @@ void PolicyEngine::load_policies_from_json() {
 bool PolicyEngine::should_trace(int syscall_no) {
     static const unordered_set<int> skip = {
         //9, 12, 39, 104, 105, 106, 107, 108, 108, 110, 112, 113, 114, 231, 238, 262, 334, 273, 10, 158, 318, 302, 218, 17, 11
-	
     };
     return skip.find(syscall_no) == skip.end();
 }
@@ -117,12 +117,13 @@ Policy PolicyEngine::evaluate(int syscall_no) {
 
 
 void PolicyEngine::deny_syscall(pid_t target, int syscall_no, struct user_regs_struct regs, Policy policy) {
-	printf("\n[--] DENY : %d - %s\n", policy.syscall_no, policy.syscall.c_str());
+	printf("\n[-] DENY : %d - %s\n", policy.syscall_no, policy.syscall.c_str());
 	regs.orig_rax = -1;
 	regs.rax = policy.stub_return;
 	ptrace(PTRACE_SETREGS, target, 0, &regs);
 }
 
+/*
 bool PolicyEngine::check_conditions(pid_t target, Policy policy, struct user_regs_struct regs) {
 	if (policy.conditions.field.empty()) return true;
 	long actual_value = 0;
@@ -148,7 +149,6 @@ bool PolicyEngine::check_conditions(pid_t target, Policy policy, struct user_reg
         	actual_value = regs.edx;
 #endif 
 	}
-
 	if (policy.conditions.operator_ == "equals") {
 		if (holds_alternative<int>(policy.conditions.value)) {
 			return actual_value == get<int>(policy.conditions.value); // 
@@ -160,58 +160,72 @@ bool PolicyEngine::check_conditions(pid_t target, Policy policy, struct user_reg
 	}
 	return false;
 }
+*/
 
 void PolicyEngine::modify_syscall(pid_t target, int syscall_no, struct user_regs_struct regs, Policy policy) {
-	if (policy.use_conditions) {
-		if (!check_conditions(target, policy, regs)) return;
-	}
-
+	//if (policy.use_conditions) {
+	//	if (!check_conditions(target, policy, regs)) return;
+	//}
 	ReadMemory read_mem;
 	WriteMemory write_mem;
+	cout << "[*] MODIFY | " <<  policy.syscall
+	<< "(0x" << hex << regs.rdi << "=" << read_mem.read_string(target, regs.rdi)
+	<< ", 0x" << hex << regs.rsi << "=" << read_mem.read_string(target, regs.rsi)
+	<< ", 0x" << hex << regs.rdx << "=" << read_mem.read_string(target, regs.rdx) << ")" << endl;
+	
+	/*
+	if (holds_alternative<long>(policy.args.rdi)) {
+		if (get<long>(policy.args.rdi) != -1) {
+			regs.rdi = get<long>(policy.args.rdi);
+		} 
+	} else if (holds_alternative<string>(policy.args.rdi)){
+		write_mem.write_string(target, regs.rdi, get<string>(policy.args.rdi) + '\0');
+		cout << get<string>(policy.args.rdi) + '\0';
+	} 
 
-	//string mem_str = read_mem.read_string(target, arg, 256);
-	//if (policy.condition != mem_str) return;
-	//write_mem.write_string(target, arg, policy.modify);
-	//printf("\n[**] MODIFY : %d - %s\n", policy.syscall_no, policy.syscall.c_str());
-	//printf("0x%llx : %s -> %s\n", arg, mem_str.c_str(), policy.modify.c_str());
-  	// Apply modifications from policy.arguments
-    	// Write modified registers back to target process
-
-	// vector<variant<int, string>> arguments;
-	auto it = policy.arguments.begin();
-	int arg_ = 1;
-	for (it; it != policy.arguments.end(); ++it, ++arg_) {
-		if (holds_alternative<int>(*it)) {
-			int value = get<int>(*it);
-			if (value == -1) {
-				continue;
-			} else {
-				switch (arg_) {
-					case 1: regs.rdi = value; break;
-            				case 2: regs.rsi = value; break;
-            				case 3: regs.rdx = value; break;
-            				case 4: regs.r10 = value; break;
-            				case 5: regs.r8 = value; break;
-            				case 6: regs.r9 = value; break;
-				}
-
-			}
-		} else if (holds_alternative<string>(*it)) {
-			switch (arg_) {
-				case 1: write_mem.write_string(target, regs.rdi, get<string>(*it)); break;
-				case 2: write_mem.write_string(target, regs.rsi, get<string>(*it)); break;
-				case 3: write_mem.write_string(target, regs.rdx, get<string>(*it)); break;
-				case 4: write_mem.write_string(target, regs.r10, get<string>(*it)); break;
-				case 5: write_mem.write_string(target, regs.r8, get<string>(*it)); break;
-			}
+	if (holds_alternative<long>(policy.args.rsi)) {
+		if (get<long>(policy.args.rsi) != -1) {
+			regs.rsi = get<long>(policy.args.rsi);
 		}
+
+	} else if (holds_alternative<string>(policy.args.rsi)) {
+		write_mem.write_string(target, regs.rsi, get<string>(policy.args.rsi)  + '\0');
 	}
+
+	if (holds_alternative<long>(policy.args.rdx)) {
+		if (get<long>(policy.args.rdx) != -1) {
+			regs.rdx = get<long>(policy.args.rdx);
+		}
+
+	} else if (holds_alternative<string>(policy.args.rdx)) {
+		write_mem.write_string(target, regs.rdx, get<string>(policy.args.rdx) + '\0');
+	}
+	if (holds_alternative<long>(policy.args.r10)) {
+		if (get<long>(policy.args.r10) != -1) {
+			regs.r10 = get<long>(policy.args.r10);
+		}
+
+	} else if (holds_alternative<string>(policy.args.r10)) {
+		write_mem.write_string(target, regs.r10, get<string>(policy.args.r10) + '\0');
+	}
+	*/
+
+
+	
+
 	ptrace(PTRACE_SETREGS, target, nullptr, &regs);
-    	printf("[**] MODIFY: %d - %s\n(rdi=0x%llx rsi=0x%llx rdx=0x%llx) mem[(%s), (%s), (%s)]\n",
-		policy.syscall_no, policy.syscall.c_str(),
-		regs.rdi, regs.rsi, regs.rdx, read_mem.read_string(target, regs.rdi).c_str(),
-		read_mem.read_string(target, regs.rsi), read_mem.read_string(target, regs.rdx)
-		);
+    	//printf("[*] MODIFY: %d - %s\n(0x%llx, 0x%llx, 0x%llx) mem[(%s), (%s), (%s)]",
+	//	policy.syscall_no, policy.syscall.c_str(),
+	//	regs.rdi, regs.rsi, regs.rdx, read_mem.read_string(target, regs.rdi).c_str(),
+	//	read_mem.read_string(target, regs.rsi), read_mem.read_string(target, regs.rdx)
+	//);
+
+	cout << "[**] AFTER MODIFICATION | " <<  policy.syscall
+	<< "(0x" << hex << regs.rdi << "=" << read_mem.read_string(target, regs.rdi)
+	<< ", 0x" << hex << regs.rsi << "=" << read_mem.read_string(target, regs.rsi)
+	<< ", 0x" << hex << regs.rdx << "=" << read_mem.read_string(target, regs.rdx) << ")";
+	
+	
 
 }
 
@@ -240,7 +254,7 @@ void PolicyEngine::create_policy() {
     	cout << "Enable this policy? (1=yes, 0=no): ";
     	cin >> p.enabled;
 	
-
+	/*
     	// use conditions?
     	cout << "Use conditions? (1=yes, 0=no): ";
     	cin >> p.use_conditions;
@@ -264,10 +278,11 @@ void PolicyEngine::create_policy() {
         	    	p.conditions.value = raw;
         	}
     	}
+	*/
 
     	// modify arguments only if modify
     	if (p.action == ACTION_TYPE::MODIFY) {
-    	    auto ask_arg = [&](const string &name) -> variant<int, string> {
+    	    auto ask_arg = [&](const string &name) -> variant<long, string> {
     	        cout << name << " (value or -1 to skip): ";
     	        string input;
     	        cin >> input;
@@ -279,10 +294,13 @@ void PolicyEngine::create_policy() {
     	        }
     	    };
 
-    	    p.arguments.push_back(ask_arg("arg1"));
-    	    p.arguments.push_back(ask_arg("arg2"));
-    	    p.arguments.push_back(ask_arg("arg3"));
-    	    p.arguments.push_back(ask_arg("arg4"));
+
+
+
+    	p.args.rdi =  ask_arg("rdi");
+    	p.args.rsi =  ask_arg("rsi");
+    	p.args.rdx =  ask_arg("rdx");
+    	p.args.r10 =  ask_arg("r10");
     	}
 
 	json old_policy;
@@ -314,24 +332,24 @@ void PolicyEngine::create_policy() {
 	pjson["enabled"] = p.enabled;
 	pjson["action"] = action;
 
-	if (p.use_conditions) {
-	    	json cond;
-	    	cond["value"] = variant_to_json(p.conditions.value);
-	    	cond["operator"] = p.conditions.operator_;
-	    	cond["field"] = p.conditions.field;
-
-	    	pjson["use_conditions"] = true;
-	    	pjson["conditions"] = json::array({ cond });
-	} else {
+	//if (p.use_conditions) {
+	//    	json cond;
+	//    	cond["value"] = variant_to_json(p.conditions.value);
+	//    	cond["operator"] = p.conditions.operator_;
+	//    	cond["field"] = p.conditions.field;
+//
+	//    	pjson["use_conditions"] = true;
+	//    	pjson["conditions"] = json::array({ cond });
+	//} else {
 	    	pjson["use_conditions"] = false;
-	}
+	//}
 
 	if (p.action == ACTION_TYPE::MODIFY) {
 	    	pjson["arguments"] = {
-	    	    	{"arg1", variant_to_json(p.arguments[0])},
-	    	    	{"arg2", variant_to_json(p.arguments[1])},
-	    	    	{"arg3", variant_to_json(p.arguments[2])},
-	    	    	{"arg4", variant_to_json(p.arguments[3])}
+	    	    	{"rdi", variant_to_json(p.args.rdi)},
+	    	    	{"rsi", variant_to_json(p.args.rsi)},
+	    	    	{"rdx", variant_to_json(p.args.rdx)},
+	    	    	{"r10", variant_to_json(p.args.r10)}
 	    	};
 	}
 	// --- Append new entry ---
@@ -346,15 +364,15 @@ void PolicyEngine::create_policy() {
 	count++;
 }
 
-json PolicyEngine::variant_to_json(const variant<int, string> &v) {
-    	if (holds_alternative<int>(v))
-    		return get<int>(v);
+json PolicyEngine::variant_to_json(const variant<long, string> &v) {
+    	if (holds_alternative<long>(v))
+    		return get<long>(v);
     	return get<string>(v);
 }
 
-string PolicyEngine::variant_to_string(const variant<int, string>& v) {
-    if (holds_alternative<int>(v))
-        return to_string(get<int>(v));
+string PolicyEngine::variant_to_string(const variant<long, string>& v) {
+    if (holds_alternative<long>(v))
+        return to_string(get<long>(v));
 
     return get<string>(v);
 }
@@ -383,7 +401,7 @@ void PolicyEngine::add_commands() {
 }
 
 void PolicyEngine::list_policies() {
-	 cout << "\n=== Existing Policies ===\n";
+	cout << "\n=== Existing Policies ===\n";
 
     	if (policies.empty()) {
     	    	cout << "No policies found.\n";
@@ -398,20 +416,16 @@ void PolicyEngine::list_policies() {
 		<< "Action: " << p.action << endl
 		<< "Enabled: " << (p.enabled ? "true" : "false") << endl;
 
-		if (p.use_conditions) {
-			if (p.action == ACTION_TYPE::MODIFY) {
-				cout << "Arguments:";
-            			cout << "\n        arg1 = " << variant_to_string(p.arguments[0]);
-            			cout << "\n        arg2 = " << variant_to_string(p.arguments[1]);
-            			cout << "\n        arg3 = " << variant_to_string(p.arguments[2]);
-            			cout << "\n        arg4 = " << variant_to_string(p.arguments[3]);
-			}
-
-			cout << "Condtions: ";
-			cout << "\n	[" << p.conditions.field << " "
-			<< p.conditions.operator_ << " " << variant_to_string(p.conditions.value) << "]" << endl;
-
+		
+		if (p.action == ACTION_TYPE::MODIFY) {
+			cout << "Arguments:";
+            		cout << "\n        rdi = " << variant_to_string(p.args.rdi);
+            		cout << "\n        rsi = " << variant_to_string(p.args.rsi);
+            		cout << "\n        rdx = " << variant_to_string(p.args.rdx);
+            		cout << "\n        r10 = " << variant_to_string(p.args.r10);
 		}
+
+			
 	}
 }
 
@@ -446,71 +460,35 @@ void PolicyEngine::edit_policy() {
     	cout << "Enable this policy? (1=yes, 0=no): ";
     	cin >> p.enabled;
 
-    	// use conditions?
-    	cout << "Use conditions? (1=yes, 0=no): ";
-    	cin >> p.use_conditions;
-
-    	if (p.use_conditions) {
-
-        	cout << "Condition argument (arg1/arg2/arg3/arg4): ";
-        	cin >> p.conditions.field;
-
-        	cout << "Operator (equals/greater/less/contains): ";
-        	cin >> p.conditions.operator_;
-
-        	cout << "Condition value (int or string): ";
-        	string raw;
-        	cin >> raw;
-        	// detect int or string
-        	try {
-        	    	int v = stoi(raw);
-        	    	p.conditions.value = v;
-        	} catch (...) {
-        	    	p.conditions.value = raw;
-        	}
-    	}
-
+    	
     	// modify arguments only if modify
     	if (p.action == ACTION_TYPE::MODIFY) {
-    	    auto ask_arg = [&](const string &name) -> variant<int, string> {
-    	        cout << name << " (value or -1 to skip): ";
-    	        string input;
-    	        cin >> input;
+    	   	auto ask_arg = [&](const string &name) -> variant<long, string> {
+    	        	cout << name << " (value or -1 to skip): ";
+    	        	string input;
+    	        	cin >> input;
 
-    	        try {
-    	            return stoi(input);
-    	        } catch (...) {
-    	            return input;
-    	        }
-    	    };
+    	        	try {
+    	        	    return stoi(input);
+    	        	} catch (...) {
+    	        	    return input;
+    	        	}
+    		 };
 
-    	    p.arguments.push_back(ask_arg("arg1"));
-    	    p.arguments.push_back(ask_arg("arg2"));
-    	    p.arguments.push_back(ask_arg("arg3"));
-    	    p.arguments.push_back(ask_arg("arg4"));
-    	}
+	}
 
 	json j;
 	j["id"] = p.id;
 	j["syscall"] = p.syscall;
 	j["enabled"] = p.enabled;
-	if (p.use_conditions) {
-		j["use_conditions"] = true;
-		j["conditions"] = json::array();
-
-
-		j["conditions"]["value"] = variant_to_json(p.conditions.value);
-		j["conditions"]["operator"] = p.conditions.operator_;
-		j["conditions"]["field"] = p.conditions.field;
-	} else {
-		j["use_conditions"] = false;
-	}
 
 	if (p.action == ACTION_TYPE::MODIFY) {
-		j["arguments"]["arg1"] = variant_to_json(p.arguments[0]);
-		j["arguments"]["arg2"] = variant_to_json(p.arguments[1]);
-		j["arguments"]["arg3"] = variant_to_json(p.arguments[2]);
-		j["arguments"]["arg4"] = variant_to_json(p.arguments[3]);
+	    	j["arguments"] = {
+	    	    	{"rdi", variant_to_json(p.args.rdi)},
+	    	    	{"rsi", variant_to_json(p.args.rsi)},
+	    	    	{"rdx", variant_to_json(p.args.rdx)},
+	    	    	{"r10", variant_to_json(p.args.r10)}
+	    	};
 	}
 
 	ofstream outfile(policy_config);
