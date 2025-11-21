@@ -150,6 +150,7 @@ int main(int argc, char* argv[]) {
 	policy_config = "./pwntrace.json";
 	policy_engine.load_policies_from_json();
 	program_name = argv[0];
+	
 	add_commands();
 	GlobalCLI.cli();	
 	return 0;
