@@ -69,9 +69,9 @@ void PrintSyscall::popen() {
 }
 
 void PrintSyscall::pexecve() {
-	cout << ptable.get_syscall_name(pregs.orig_rax)
-		<< "(0x" << hex << pregs.rdi << "=\"" << pread_mem.read_string(ptarget, pregs.rdi)
-		<< "\", 0x" << hex << pregs.rsi << "=" << pread_mem.read_string(ptarget, pregs.rsi)
+		cout << ptable.get_syscall_name(pregs.orig_rax)
+		<< "(0x" << hex << pregs.rdi << "=" << pread_mem.read_string(ptarget, pregs.rdi)
+		<< ", 0x" << hex << pregs.rsi << "=" << pread_mem.read_string(ptarget, pregs.rsi)
 		<< ", 0x" << hex << pregs.rdx << "=" << pread_mem.read_string(ptarget, pregs.rdx) << ")";
 }
 
