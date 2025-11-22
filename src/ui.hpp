@@ -23,7 +23,12 @@ struct Command {
 class CommandGroup {
 	public:
 		string name;
-		static unordered_map<string, Command> commands;
+		//static unordered_map<string, Command> commands;
+		
+		static unordered_map<string ,Command>& commands() {
+		    	static unordered_map<string,Command> m;
+		    	return m;
+		}
 
 		CommandGroup() : name("") {}
 
@@ -35,7 +40,11 @@ class CommandGroup {
 
 class CLI {
 	private:
-		static unordered_map<string, CommandGroup> groups;
+		//static unordered_map<string, CommandGroup> groups;
+		static unordered_map<string ,CommandGroup>& groups() {
+		    	static unordered_map<string,CommandGroup> m;
+		    	return m;
+		}
 		static char *cmd_generator(const char* text, int state);
 		static char **cli_completion(const char* text, int start, int end);
 		static string expand_home(const string& path);

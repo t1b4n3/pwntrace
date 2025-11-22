@@ -5,14 +5,6 @@ CLI GlobalCLI;
 //unordered_map<string, Command> CommandGroup::commands;
 //unordered_map<string, CommandGroup> CLI::groups;
 
-static unordered_map<string ,CommandGroup>& groups() {
-    static unordered_map<string,CommandGroup> m;
-    return m;
-}
-static unordered_map<string ,Command>& commands() {
-    static unordered_map<string,Command> m;
-    return m;
-}
 
 
 void CommandGroup::add(const string cmd, const string desc, 
@@ -99,13 +91,13 @@ char *CLI::cmd_generator(const char* text, int state) {
 	    	list_index = 0;
 	
 	    	// Collect all possible commands from all groups
-	    	for (const auto& [groupName, group] : groups()) {
+	    	for (const auto& [groupName, group] : GlobalCLI.groups()) {
 	    	    	// Complete group names
 	    	    	if (groupName.find(text) == 0)
 	    	    	    matches.push_back(groupName);
 			
 	    	    	// Complete commands inside this group
-	    	    	for (const auto& [cmdName, cmd] : commands()) {
+	    	    	for (const auto& [cmdName, cmd] : group.commands()) {
 	    	    	    std::string full = groupName + " " + cmdName;
 	    	    	    if (full.find(text) == 0)
 	    	    	        matches.push_back(full);
