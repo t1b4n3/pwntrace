@@ -2,17 +2,27 @@
 
 CLI GlobalCLI; 
 
-unordered_map<string, Command> CommandGroup::commands;
-unordered_map<string, CommandGroup> CLI::groups;
+//unordered_map<string, Command> CommandGroup::commands;
+//unordered_map<string, CommandGroup> CLI::groups;
+
+static unordered_map<string ,CommandGroup>& groups() {
+    static unordered_map<string,CommandGroup> m;
+    return m;
+}
+static unordered_map<string ,Command>& commands() {
+    static unordered_map<string,Command> m;
+    return m;
+}
+
 
 void CommandGroup::add(const string cmd, const string desc, 
 	function<void(const vector<string>&)> fn) {
-	commands[cmd] = Command{cmd, desc, fn};
+	commands()[cmd] = Command{cmd, desc, fn};
 }
 
 bool CommandGroup::execute(const string cmd, const vector<string>& args) const {
-	auto it = commands.find(cmd);
-	if (it == commands.end()) return false;
+	auto it = commands().find(cmd);
+	if (it == commands().end()) return false;
 	it->second.handler(args);
 	return true;
 }
@@ -22,8 +32,8 @@ void CLI::parse_and_execute(const string& line) {
 	string groupName, cmdName;
 	iss >> groupName >> cmdName;
 
-	auto it = groups.find(groupName);
-	if (it == groups.end()) {
+	auto it = groups().find(groupName);
+	if (it == groups().end()) {
 		cout << "[-] Unknown Group: " << groupName << endl;
 		return;
 	} 
@@ -54,7 +64,7 @@ CommandGroup& CLI::add_group(const string& name) {
 	//	return inserted.first->second;
 	//}
 	//return it->second;
-    	auto [it, inserted] = groups.try_emplace(name, name);
+    	auto [it, inserted] = groups().try_emplace(name, name);
     	return it->second;
 
 }
@@ -89,13 +99,13 @@ char *CLI::cmd_generator(const char* text, int state) {
 	    	list_index = 0;
 	
 	    	// Collect all possible commands from all groups
-	    	for (const auto& [groupName, group] : GlobalCLI.groups) {
+	    	for (const auto& [groupName, group] : groups()) {
 	    	    	// Complete group names
 	    	    	if (groupName.find(text) == 0)
 	    	    	    matches.push_back(groupName);
 			
 	    	    	// Complete commands inside this group
-	    	    	for (const auto& [cmdName, cmd] : group.commands) {
+	    	    	for (const auto& [cmdName, cmd] : commands()) {
 	    	    	    std::string full = groupName + " " + cmdName;
 	    	    	    if (full.find(text) == 0)
 	    	    	        matches.push_back(full);
