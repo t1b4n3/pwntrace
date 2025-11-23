@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <cstdlib>
+#include <cstdint>
 #include <unistd.h>
 #include <sys/ptrace.h>
 #include <sys/user.h>
@@ -21,6 +22,10 @@
 #include <fstream>
 #include <regex>
 #include <variant>
+#include <unistd.h>
+#include <sys/mman.h>
+
+#pragma once
 
 using namespace std;
 
@@ -39,6 +44,7 @@ class WriteMemory {
 	public:
 		void write_string(pid_t target, uint64_t addr, string to_write); 
 		ssize_t write_remote_memory(pid_t target, void *addr, const void *buf, size_t len);
+		uint64_t alloc_memory(pid_t target, size_t size);
 		//bool modify_register(pid_t target, long register, variant<long, string> &value);
 };	
 

@@ -103,3 +103,33 @@ ssize_t WriteMemory::write_remote_memory(pid_t target, void *addr, const void *b
 	}
 	return static_cast<ssize_t>(written);
 }
+
+
+uint64_t WriteMemory::alloc_memory(pid_t target, size_t size) {
+	struct user_regs_struct regs, saved;
+	ptrace(PTRACE_GETREGS, target, nullptr, &saved);
+	regs = saved;
+	regs.orig_rax = 9; // mmap
+	regs.rdi = 0;
+	regs.rsi = size;
+	regs.rdx = PROT_READ|PROT_WRITE|PROT_EXEC;
+	regs.r10 = MAP_PRIVATE|MAP_ANONYMOUS;
+	regs.r8 = -1;
+	regs.r9 = 0;
+	int status;
+	ptrace(PTRACE_SETREGS, target, nullptr, &regs);
+	//enter syscall
+	ptrace(PTRACE_SYSCALL, target, 0, 0);
+	waitpid(target, &status, 0);
+
+	// exit syscall
+	ptrace(PTRACE_SYSCALL, target, 0, 0);
+	waitpid(target, &status, 0);
+
+	// read result
+	ptrace(PTRACE_GETREGS, target, nullptr, &regs);
+	uint64_t addr = regs.rax;
+
+	ptrace(PTRACE_SETREGS, target, nullptr, &saved);
+	return addr;
+}			
