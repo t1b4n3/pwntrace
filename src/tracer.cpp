@@ -266,4 +266,5 @@ void tracer(pid_t pid, string pathname) {
     		}
 	}
 	log_message(LOG_INFO, "Pwntrace DONE");
+	cout << endl;
 }
