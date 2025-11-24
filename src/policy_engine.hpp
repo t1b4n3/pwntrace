@@ -28,7 +28,7 @@ typedef enum {
 	DENY,
 	MODIFY,
 	STUB,
-	LOG_ONLY,
+	LOG_ONLY
 } ACTION_TYPE;
 
 

@@ -55,40 +55,47 @@ void PolicyEngine::load_policies_from_json() {
     	    	p.enabled = item.value("enabled", true);
     	    	p.stub_return = item.value("stub_return", 0);
 		count++;
-		if (item.contains("arguments") && !item["arguments"].empty()) {
+		if (item.contains("arguments")) {
 
-			auto &arg = item["arguments"][0];
+			auto &arg = item["arguments"];
 			if (arg["rdi"].is_string()) {
 				p.args.rdi = arg["rdi"].get<string>();
 			} else if (arg["rdi"].is_number_integer()) {
 				p.args.rdi = arg["rdi"].get<long>();
+			} else if (arg["rdi"].is_null()) {
+				p.args.rdi = long(-1);
 			} else {
-				p.args.rdi = arg["rdi"].dump();
+				throw runtime_error("Invalid type for argument rdi");
 			}
 
 			if (arg["rsi"].is_string()) {
-				p.args.rdi = arg["rsi"].get<string>();
+				p.args.rsi = arg["rsi"].get<string>();
 			} else if (arg["rsi"].is_number_integer()) {
-				p.args.rdi = arg["rsi"].get<long>();
+				p.args.rsi = arg["rsi"].get<long>();
 			} else {
-				p.args.rdi = arg["rsi"].dump();
+				p.args.rsi = arg["rsi"].dump();
 			}
 			if (arg["rdx"].is_string()) {
-				p.args.rdi = arg["rdx"].get<string>();
+				p.args.rdx = arg["rdx"].get<string>();
 			} else if (arg["rdx"].is_number_integer()) {
-				p.args.rdi = arg["rdx"].get<long>();
+				p.args.rdx = arg["rdx"].get<long>();
 			} else {
-				p.args.rdi = arg["rdx"].dump();
+				p.args.rdx = arg["rdx"].dump();
 			}
 			if (arg["r10"].is_string()) {
-				p.args.rdi = arg["r10"].get<string>();
+				p.args.r10 = arg["r10"].get<string>();
 			} else if (arg["r10"].is_number_integer()) {
-				p.args.rdi = arg["r10"].get<long>();
+				p.args.r10 = arg["r10"].get<long>();
 			} else {
-				p.args.rdi = arg["r10"].dump();
+				p.args.r10 = arg["r10"].dump();
 			}
 			
 			
+		} else {
+			p.args.r10 = long(-1);
+			p.args.rdi = long(-1);
+			p.args.rdx = long(-1);
+			p.args.rsi = long(-1);
 		}
 
     	    	policies[p.syscall_no] = p;
@@ -110,8 +117,7 @@ Policy PolicyEngine::evaluate(int syscall_no) {
 	if (it == policies.end()) return {.action = ACTION_TYPE::ALLOW};
 
 	Policy &p = it->second;
-	if (!p.enabled) return {.action = ACTION_TYPE::ALLOW};
-
+	if (!p.enabled) return {.action = ACTION_TYPE::ALLOW};	
 	return p;
 }
 
@@ -166,21 +172,24 @@ void PolicyEngine::modify_syscall(pid_t target, int syscall_no, struct user_regs
 	//if (policy.use_conditions) {
 	//	if (!check_conditions(target, policy, regs)) return;
 	//}
+	struct user_regs_struct saved = regs;
 	ReadMemory read_mem;
 	WriteMemory write_mem;
 	cout << "[*] MODIFY | " <<  policy.syscall
 	<< "(0x" << hex << regs.rdi << "=" << read_mem.read_string(target, regs.rdi)
 	<< ", 0x" << hex << regs.rsi << "=" << read_mem.read_string(target, regs.rsi)
 	<< ", 0x" << hex << regs.rdx << "=" << read_mem.read_string(target, regs.rdx) << ")" << endl;
-	
-	/*
+
 	if (holds_alternative<long>(policy.args.rdi)) {
-		if (get<long>(policy.args.rdi) != -1) {
-			regs.rdi = get<long>(policy.args.rdi);
-		} 
+		long value = get<long>(policy.args.rdi); 
+		if (value != -1) {
+			regs.rdi = value;
+		}
 	} else if (holds_alternative<string>(policy.args.rdi)){
-		write_mem.write_string(target, regs.rdi, get<string>(policy.args.rdi) + '\0');
-		cout << get<string>(policy.args.rdi) + '\0';
+		string str = get<string>(policy.args.rdi) + '\0';
+		//uint64_t addr = write_mem.alloc_memory(target, str.size());
+		write_mem.write_string(target, regs.rdi, str);
+		//regs.rdi = addr;
 	} 
 
 	if (holds_alternative<long>(policy.args.rsi)) {
@@ -189,7 +198,12 @@ void PolicyEngine::modify_syscall(pid_t target, int syscall_no, struct user_regs
 		}
 
 	} else if (holds_alternative<string>(policy.args.rsi)) {
-		write_mem.write_string(target, regs.rsi, get<string>(policy.args.rsi)  + '\0');
+		//write_mem.write_string(target, regs.rsi, get<string>(policy.args.rsi)  + '\0');
+		string str = get<string>(policy.args.rsi) + '\0';
+		//uint64_t addr = write_mem.alloc_memory(target, str.size());
+		write_mem.write_string(target, regs.rsi, str);
+		//regs.rsi = addr;
+		//cout << "rsi: " << hex << addr << " @ " << str << "\n";
 	}
 
 	if (holds_alternative<long>(policy.args.rdx)) {
@@ -198,7 +212,11 @@ void PolicyEngine::modify_syscall(pid_t target, int syscall_no, struct user_regs
 		}
 
 	} else if (holds_alternative<string>(policy.args.rdx)) {
-		write_mem.write_string(target, regs.rdx, get<string>(policy.args.rdx) + '\0');
+		//write_mem.write_string(target, regs.rdx, get<string>(policy.args.rdx) + '\0');
+		string str = get<string>(policy.args.rdx) + '\0';
+		//uint64_t addr = write_mem.alloc_memory(target, str.size());
+		write_mem.write_string(target, regs.rdx, str);
+		//regs.rdx = addr;
 	}
 	if (holds_alternative<long>(policy.args.r10)) {
 		if (get<long>(policy.args.r10) != -1) {
@@ -206,12 +224,12 @@ void PolicyEngine::modify_syscall(pid_t target, int syscall_no, struct user_regs
 		}
 
 	} else if (holds_alternative<string>(policy.args.r10)) {
-		write_mem.write_string(target, regs.r10, get<string>(policy.args.r10) + '\0');
+		//write_mem.write_string(target, regs.r10, get<string>(policy.args.r10) + '\0');
+		string str = get<string>(policy.args.r10) + '\0';
+		uint64_t addr = write_mem.alloc_memory(target, str.size());
+		write_mem.write_string(target, addr, str);
+		regs.r10 = addr;
 	}
-	*/
-
-
-	
 
 	ptrace(PTRACE_SETREGS, target, nullptr, &regs);
     	//printf("[*] MODIFY: %d - %s\n(0x%llx, 0x%llx, 0x%llx) mem[(%s), (%s), (%s)]",
@@ -219,13 +237,20 @@ void PolicyEngine::modify_syscall(pid_t target, int syscall_no, struct user_regs
 	//	regs.rdi, regs.rsi, regs.rdx, read_mem.read_string(target, regs.rdi).c_str(),
 	//	read_mem.read_string(target, regs.rsi), read_mem.read_string(target, regs.rdx)
 	//);
+	cout << "[**] MODIFICATION | " <<  policy.syscall
+	<< "(0x" << hex << regs.rdi << "=" << read_mem.read_string(target, regs.rdi)
+	<< ", 0x" << hex << regs.rsi << "=" << read_mem.read_string(target, regs.rsi)
+	<< ", 0x" << hex << regs.rdx << "=" << read_mem.read_string(target, regs.rdx) << ")\n";
 
-	cout << "[**] AFTER MODIFICATION | " <<  policy.syscall
+	ptrace(PTRACE_SETREGS, target, nullptr, &saved);
+
+	cout << "[*] After MODIFICATION | " <<  policy.syscall
 	<< "(0x" << hex << regs.rdi << "=" << read_mem.read_string(target, regs.rdi)
 	<< ", 0x" << hex << regs.rsi << "=" << read_mem.read_string(target, regs.rsi)
 	<< ", 0x" << hex << regs.rdx << "=" << read_mem.read_string(target, regs.rdx) << ")";
-	
-	
+
+
+
 
 }
 
@@ -386,6 +411,10 @@ void PolicyEngine::add_commands() {
 		create_policy();
 	});
 
+	policy.add("reload", "Reload policy configuration file", [&](auto args) {
+		load_policies_from_json();
+	});
+
 	policy.add("list","View all policies",  [&](auto args){
 		list_policies();
 	});
@@ -396,8 +425,7 @@ void PolicyEngine::add_commands() {
 
 	policy.add("edit", "edit policy", [&](auto args){
 		edit_policy();
-	});
-	
+	});	
 }
 
 void PolicyEngine::list_policies() {
@@ -410,6 +438,7 @@ void PolicyEngine::list_policies() {
 	
 	for (const auto &entry : policies) {
 		const Policy &p = entry.second;
+		cout << "-----------------\n";
 		cout << "ID: " << p.id << endl 
 		<< "Syscall Name: " << p.syscall << endl
 		<< "Syscall No: " << p.syscall_no << endl
@@ -424,8 +453,7 @@ void PolicyEngine::list_policies() {
             		cout << "\n        rdx = " << variant_to_string(p.args.rdx);
             		cout << "\n        r10 = " << variant_to_string(p.args.r10);
 		}
-
-			
+		cout << endl;		
 	}
 }
 
