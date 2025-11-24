@@ -58,7 +58,8 @@ void PrintSyscall::pclose() {
 
 void PrintSyscall::pread() {
     	cout << ptable.get_syscall_name(pregs.orig_rax)
-              << "(0x" << std::hex << pregs.rdi << ")";
+              << "(0x" << std::hex << pregs.rdi << ","
+	      << "0x" << hex << pregs.rsi << ",0x" << hex << pregs.rdx << ")";
 }
 
 void PrintSyscall::popen() {
