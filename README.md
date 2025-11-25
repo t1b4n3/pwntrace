@@ -4,6 +4,26 @@ pwntrace is syscall debugging tool.
 
 Intercepts syscalls in userspace and it allows security researchers to monitor, modify, and control system calls made by applications in real-time, enabling analysis of malware behavior, testing exploits in controlled environments and understanding program interactions with the operating system
 
+
+## Get Started
+
+clone repo
+
+```sh
+git clone https://github.com/t1b4n3/pwntrace.git && cd pwntrace
+```
+
+Build
+
+```sh
+make
+```
+
+You should find the tool in `./build/` name `pwntrace`
+
+
+## WHY?
+
 What it does:
 - intercepts selected syscalls of a target process and logs and/or forwards them to a proxy.
 - policy engine to permit/deny/modify behavior
