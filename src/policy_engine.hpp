@@ -58,7 +58,7 @@ struct Policy {
 	//Conditions conditions;
 	//vector<variant<int, string>> arguments;
 	Arguments args;
-	long stub_return = 0;
+	long stub_return = 0xffffffffffffffff;
 };
 
 class PolicyEngine {
@@ -79,6 +79,9 @@ class PolicyEngine {
 		void deny_syscall(pid_t target, int syscall_no, struct user_regs_struct regs, Policy policy);
 		//bool check_conditions(pid_t target, Policy policy, struct user_regs_struct regs);
 		
+		// modify register
+		void modify_register(pid_t target, unsigned long long &addr_to_write, variant<long, string>& value);
+
 		json variant_to_json(const variant<long, string> &v);
 		void add_commands();
 		void create_policy();

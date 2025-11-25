@@ -53,7 +53,7 @@ void PolicyEngine::load_policies_from_json() {
     	    	p.syscall_no = table.get_syscall_no(item["syscall"]);
     	    	p.action = parse_action(item.value("action", "allow"));
     	    	p.enabled = item.value("enabled", true);
-    	    	p.stub_return = item.value("stub_return", 0);
+    	    	p.stub_return = item.value("stub_return", 0xffffffffffffffff);
 		count++;
 		if (item.contains("arguments")) {
 
@@ -167,91 +167,69 @@ bool PolicyEngine::check_conditions(pid_t target, Policy policy, struct user_reg
 	return false;
 }
 */
+void PolicyEngine::modify_register(pid_t target, unsigned long long &addr_to_write, variant<long, string>& value) {
+	WriteMemory write_mem;
+	if (holds_alternative<long>(value)) {
+		long v = get<long>(value);
+		if (v != -1) {
+			addr_to_write = v;
+		} else {
+			return;
+		}
+	} else if (holds_alternative<string>(value)) {
+		if (is_user_address(static_cast<uint64_t>(addr_to_write))) {
+			write_mem.write_string(target, static_cast<uint64_t>(addr_to_write), get<string>(value));
+		} else {
+			uint64_t new_addr = write_mem.alloc_memory(target, get<string>(value).size() + 1);
+			write_mem.write_string(target, new_addr, get<string>(value));
+			addr_to_write = new_addr;
+		}	
+	}
+}
+
 
 void PolicyEngine::modify_syscall(pid_t target, int syscall_no, struct user_regs_struct regs, Policy policy) {
 	//if (policy.use_conditions) {
 	//	if (!check_conditions(target, policy, regs)) return;
 	//}
 	struct user_regs_struct saved = regs;
+	//ptrace(PTRACE_GETREGS, target, nullptr, &saved);
 	ReadMemory read_mem;
 	WriteMemory write_mem;
-	cout << "[*] MODIFY | " <<  policy.syscall
-	<< "(0x" << hex << regs.rdi << "=" << read_mem.read_string(target, regs.rdi)
-	<< ", 0x" << hex << regs.rsi << "=" << read_mem.read_string(target, regs.rsi)
-	<< ", 0x" << hex << regs.rdx << "=" << read_mem.read_string(target, regs.rdx) << ")" << endl;
+	cout << endl;
+	//cout << "[*] MODIFY | " <<  policy.syscall
+	//<< "(0x" << hex << regs.rdi << "=" << read_mem.read_string(target, regs.rdi)
+	//<< ", 0x" << hex << regs.rsi << "=" << read_mem.read_string(target, regs.rsi)
+	//<< ", 0x" << hex << regs.rdx << "=" << read_mem.read_string(target, regs.rdx) << ")"; //<< endl;
 
-	if (holds_alternative<long>(policy.args.rdi)) {
-		long value = get<long>(policy.args.rdi); 
-		if (value != -1) {
-			regs.rdi = value;
-		}
-	} else if (holds_alternative<string>(policy.args.rdi)){
-		string str = get<string>(policy.args.rdi) + '\0';
-		//uint64_t addr = write_mem.alloc_memory(target, str.size());
-		write_mem.write_string(target, regs.rdi, str);
-		//regs.rdi = addr;
-	} 
-
-	if (holds_alternative<long>(policy.args.rsi)) {
-		if (get<long>(policy.args.rsi) != -1) {
-			regs.rsi = get<long>(policy.args.rsi);
-		}
-
-	} else if (holds_alternative<string>(policy.args.rsi)) {
-		//write_mem.write_string(target, regs.rsi, get<string>(policy.args.rsi)  + '\0');
-		string str = get<string>(policy.args.rsi) + '\0';
-		//uint64_t addr = write_mem.alloc_memory(target, str.size());
-		write_mem.write_string(target, regs.rsi, str);
-		//regs.rsi = addr;
-		//cout << "rsi: " << hex << addr << " @ " << str << "\n";
-	}
-
-	if (holds_alternative<long>(policy.args.rdx)) {
-		if (get<long>(policy.args.rdx) != -1) {
-			regs.rdx = get<long>(policy.args.rdx);
-		}
-
-	} else if (holds_alternative<string>(policy.args.rdx)) {
-		//write_mem.write_string(target, regs.rdx, get<string>(policy.args.rdx) + '\0');
-		string str = get<string>(policy.args.rdx) + '\0';
-		//uint64_t addr = write_mem.alloc_memory(target, str.size());
-		write_mem.write_string(target, regs.rdx, str);
-		//regs.rdx = addr;
-	}
-	if (holds_alternative<long>(policy.args.r10)) {
-		if (get<long>(policy.args.r10) != -1) {
-			regs.r10 = get<long>(policy.args.r10);
-		}
-
-	} else if (holds_alternative<string>(policy.args.r10)) {
-		//write_mem.write_string(target, regs.r10, get<string>(policy.args.r10) + '\0');
-		string str = get<string>(policy.args.r10) + '\0';
-		uint64_t addr = write_mem.alloc_memory(target, str.size());
-		write_mem.write_string(target, addr, str);
-		regs.r10 = addr;
-	}
+	modify_register(target, regs.rdi, policy.args.rdi);
+	modify_register(target, regs.rsi, policy.args.rsi);
+	modify_register(target, regs.rdx, policy.args.rdx);
+	modify_register(target, regs.r10, policy.args.r10);
 
 	ptrace(PTRACE_SETREGS, target, nullptr, &regs);
-    	//printf("[*] MODIFY: %d - %s\n(0x%llx, 0x%llx, 0x%llx) mem[(%s), (%s), (%s)]",
-	//	policy.syscall_no, policy.syscall.c_str(),
-	//	regs.rdi, regs.rsi, regs.rdx, read_mem.read_string(target, regs.rdi).c_str(),
-	//	read_mem.read_string(target, regs.rsi), read_mem.read_string(target, regs.rdx)
-	//);
-	cout << "[**] MODIFICATION | " <<  policy.syscall
-	<< "(0x" << hex << regs.rdi << "=" << read_mem.read_string(target, regs.rdi)
-	<< ", 0x" << hex << regs.rsi << "=" << read_mem.read_string(target, regs.rsi)
-	<< ", 0x" << hex << regs.rdx << "=" << read_mem.read_string(target, regs.rdx) << ")\n";
+	// execute_syscall
+	int status;
+	ptrace(PTRACE_SYSCALL, target, 0, 0);
+	waitpid(target, &status, 0);
 
-	ptrace(PTRACE_SETREGS, target, nullptr, &saved);
+	// exit;
+	if (policy.stub_return != 0xffffffffffffffff) {
+		regs.rax = static_cast<unsigned long long>(policy.stub_return);
+		ptrace(PTRACE_SETREGS, target, nullptr, &regs);
+	}
+	
+	ptrace(PTRACE_SYSCALL, target, 0, 0);
+	waitpid(target, &status, 0);
 
-	cout << "[*] After MODIFICATION | " <<  policy.syscall
-	<< "(0x" << hex << regs.rdi << "=" << read_mem.read_string(target, regs.rdi)
-	<< ", 0x" << hex << regs.rsi << "=" << read_mem.read_string(target, regs.rsi)
-	<< ", 0x" << hex << regs.rdx << "=" << read_mem.read_string(target, regs.rdx) << ")";
+	cout << "[*] MODIFY | " <<  policy.syscall
+	<< "(0x" << hex << saved.rdi << "=" << read_mem.read_string(target, saved.rdi) << " -> 0x" << regs.rdi << "=" << read_mem.read_string(target, regs.rdi)
+	<< ", 0x" << hex << saved.rsi << "=" << read_mem.read_string(target, saved.rsi) << " -> 0x" << regs.rsi << "=" << read_mem.read_string(target, regs.rsi)
+	<< ", 0x" << hex << saved.rdx << "=" << read_mem.read_string(target, saved.rdx) << " -> 0x" << regs.rdx << "=" << read_mem.read_string(target, regs.rdx) <<
+	 ")"; // << endl;
+	//<<  " = 0x" << hex << ret << endl;
 
-
-
-
+	//ptrace(PTRACE_SETREGS, target, nullptr, &saved);
 }
 
 void PolicyEngine::create_policy() {
@@ -279,6 +257,15 @@ void PolicyEngine::create_policy() {
     	cout << "Enable this policy? (1=yes, 0=no): ";
     	cin >> p.enabled;
 	
+	string stub;
+	cout << "Stub return:(stub, no) ";
+	cin >> stub;
+	if (stub == "no") {
+		p.stub_return = 0xffffffffffffffff;
+	} else {
+		p.stub_return = stol(stub);
+	}
+
 	/*
     	// use conditions?
     	cout << "Use conditions? (1=yes, 0=no): ";
@@ -310,14 +297,13 @@ void PolicyEngine::create_policy() {
     	    auto ask_arg = [&](const string &name) -> variant<long, string> {
     	        cout << name << " (value or -1 to skip): ";
     	        string input;
-    	        cin >> input;
-
+    	        getline(cin, input);
     	        try {
-    	            return stoi(input);
+    	            	return stoi(input);
     	        } catch (...) {
-    	            return input;
+    	            	return input;
     	        }
-    	    };
+    	};
 
 
 
@@ -349,13 +335,13 @@ void PolicyEngine::create_policy() {
 	    	old_policy = tmp;
 	}
 
-
 	// --- Create new policy ---
 	json pjson;
 	pjson["id"] = p.id;
 	pjson["syscall"] = p.syscall;
 	pjson["enabled"] = p.enabled;
 	pjson["action"] = action;
+	pjson["stub_return"] = p.stub_return;
 
 	//if (p.use_conditions) {
 	//    	json cond;
@@ -412,7 +398,7 @@ void PolicyEngine::add_commands() {
 	});
 
 	policy.add("reload", "Reload policy configuration file", [&](auto args) {
-		load_policies_from_json();
+		reload();
 	});
 
 	policy.add("list","View all policies",  [&](auto args){
@@ -459,14 +445,15 @@ void PolicyEngine::list_policies() {
 
 void PolicyEngine::remove_policy() {
 	cout << "Enter ID to delete: ";
-	int id; cin >> id;
-
+	int id; 
+	cin >> id;
+	
 	count--;
 }
 
 void PolicyEngine::edit_policy() {
 	Policy p;
-    	cout << "=== Add New Policy ===\n";
+    	cout << "=== Edit Policy ===\n";
 
     	// syscall
     	cout << "Enter syscall: ";
