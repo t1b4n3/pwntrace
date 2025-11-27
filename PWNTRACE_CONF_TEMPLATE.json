@@ -1,0 +1,26 @@
+[
+    {
+        "action": "modify",            // What to do: modify, deny, allow.
+
+        "arguments": {                 // Registers to modify (missing ones are untouched)
+            "r10": -1,                 // -1 means “don’t modify”
+            "rdi": -1,                 
+            "rdx": 46,                 // Example: modify rdx
+            "rsi": "Hello world!"      // Example: change buffer pointer/constant text
+        },
+
+        "use_conditions": false,       // true: apply only if condition matches
+
+        "condition": {
+            "_comment": "Apply only if: field operator value",
+            "operator": ">=",          // =, >, <, <=, >=
+            "field": "rdi",            // Compare this register
+            "value": 1337            // To this value
+        },
+
+        "enabled": true,               // Enable/disable rule
+        "id": 2,                       // Unique ID
+        "stub_return": -1,             // If action=stub: what value syscall should return
+        "syscall": "write"             // Name of syscall this rule applies to
+    }
+]
