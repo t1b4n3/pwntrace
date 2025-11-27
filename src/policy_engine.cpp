@@ -20,12 +20,28 @@ PolicyEngine::PolicyEngine() {
 	add_commands();
 }
 
+void PolicyEngine::add_pwntrace_json() {
+	const char* home = getenv("HOME");
+	policy_config = string(home) + "/.pwntrace.json";
+	ifstream file(policy_config);
+	if (file.is_open()) {
+		file.close();
+		return;
+	} 
+	file.close();
+	ofstream outfile(policy_config);
+	outfile << "[]";
+	outfile.close();
+	// add a empty json file
+
+}
+
 ACTION_TYPE PolicyEngine::parse_action(const string &action_str) {
     	if (action_str == "allow") return ACTION_TYPE::ALLOW;
     	else if (action_str == "deny") return ACTION_TYPE::DENY;
     	else if (action_str == "modify") return ACTION_TYPE::MODIFY;
     	else if (action_str == "stub") return ACTION_TYPE::STUB;
-    	else return ACTION_TYPE::LOG_ONLY;
+	else return ACTION_TYPE::ALLOW;
 }
 
 void PolicyEngine::reload() {
@@ -34,6 +50,7 @@ void PolicyEngine::reload() {
 }
 
 void PolicyEngine::load_policies_from_json() {
+	add_pwntrace_json();
     	string path = policy_config;
 	ifstream file(path);
 	if (!file.is_open()) {
@@ -98,7 +115,7 @@ void PolicyEngine::load_policies_from_json() {
 
 
 		if (item.contains("conditions")) {
-			auto &arg = item["arguments"];
+			auto &arg = item["conditions"];
 			string operator_t = arg["operator"];
 			if (operator_t == "=") {
 				p.conditions.operator_t = OPERATOR_T::EQUAL;
@@ -135,9 +152,6 @@ void PolicyEngine::load_policies_from_json() {
 
 		}
 
-
-
-
     	    	policies[p.syscall_no] = p;
 		
     	}
@@ -161,8 +175,11 @@ Policy PolicyEngine::evaluate(int syscall_no) {
 	return p;
 }
 
+void PolicyEngine::stub_syscall(pid_t target, struct user_regs_struct regs, Policy policy) {
+	cout << "\n[-] STUB : " << policy.syscall_no;
+}
 
-void PolicyEngine::deny_syscall(pid_t target, int syscall_no, struct user_regs_struct regs, Policy policy) {
+void PolicyEngine::deny_syscall(pid_t target, struct user_regs_struct regs, Policy policy) {
 	printf("\n[-] DENY : %d - %s\n", policy.syscall_no, policy.syscall.c_str());
 	regs.orig_rax = -1;
 	regs.rax = policy.stub_return;
@@ -252,7 +269,7 @@ void PolicyEngine::modify_register(pid_t target, unsigned long long &addr_to_wri
 }
 
 
-void PolicyEngine::modify_syscall(pid_t target, int syscall_no, struct user_regs_struct regs, Policy policy) {
+void PolicyEngine::modify_syscall(pid_t target, struct user_regs_struct regs, Policy policy) {
 	if (policy.use_conditions) {
 		if (!check_conditions(target, policy, regs)) {
 			cout << "\n[-] CONDITIONS NOT MET\n";
@@ -307,11 +324,15 @@ void PolicyEngine::create_policy() {
     	// syscall
     	cout << "Enter syscall: ";
     	cin >> p.syscall;
+	cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+
 
     	// action
 	string action;
-    	cout << "Action (allow/deny/modify): ";
+    	cout << "Action (allow/deny/modify/stub): ";
     	cin >> action;
+	cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+
 	
 	if (action == "allow") {
 		p.action = ACTION_TYPE::ALLOW;
@@ -319,36 +340,74 @@ void PolicyEngine::create_policy() {
 		p.action = ACTION_TYPE::DENY;
 	} else if (action == "modify") {
 		p.action = ACTION_TYPE::MODIFY;
+	} else if (action == "stub") {
+		p.action = ACTION_TYPE::STUB;
 	}
     	// enabled
     	cout << "Enable this policy? (1=yes, 0=no): ";
     	cin >> p.enabled;
+	cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+
 	
 	string stub;
 	cout << "Stub return:(stub, no) ";
 	cin >> stub;
+	cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+
 	if (stub == "no") {
 		p.stub_return = 0xffffffffffffffff;
 	} else {
 		p.stub_return = stol(stub);
 	}
 
-	/*
-    	// use conditions?
+	// modify arguments only if modify
+    	if (p.action == ACTION_TYPE::MODIFY) {
+    	    	cout << "System call Arguments:\n";
+		auto ask_arg = [&](const string &name) -> variant<long, string> {
+    	        	cout << name << " (value or -1 to skip): ";
+    	        	string input;
+    	        	getline(cin, input);
+    	        	try {
+    	        	    	return stoi(input);
+    	        	} catch (...) {
+    	        	    	return input;
+    	        	}
+    		};
+
+    		p.args.rdi =  ask_arg("rdi");
+    		p.args.rsi =  ask_arg("rsi");
+    		p.args.rdx =  ask_arg("rdx");
+    		p.args.r10 =  ask_arg("r10");
+    	}
+	
     	cout << "Use conditions? (1=yes, 0=no): ";
     	cin >> p.use_conditions;
+	cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 
-    	if (p.use_conditions) {
 
-        	cout << "Condition argument (arg1/arg2/arg3/arg4): ";
-        	cin >> p.conditions.field;
+	string operator_t;
+	string field;
+    	if (p.use_conditions && (p.action == ACTION_TYPE::MODIFY || p.action == ACTION_TYPE::STUB)) {
+		
+        	cout << "Condition argument (rdi/rsi/rdx/r10): ";
+		getline(cin, field);
+		if (field == "rdi") p.conditions.field = FIELD::rdi;
+		else if (field == "rsi") p.conditions.field = FIELD::rsi;
+		else if (field == "rdx") p.conditions.field = FIELD::rdx;
+		else if (field == "r10") p.conditions.field = FIELD::r10;
 
-        	cout << "Operator (equals/greater/less/contains): ";
-        	cin >> p.conditions.operator_;
+		
+        	cout << "Operator (=/</>/<=/>=): ";
+        	getline(cin, operator_t);
+		if (operator_t == "=") p.conditions.operator_t = OPERATOR_T::EQUAL;
+		else if (operator_t == ">=") p.conditions.operator_t = OPERATOR_T::EQUAL_GREATER;
+		else if (operator_t == "<=") p.conditions.operator_t = OPERATOR_T::EQUAL_LESSER;
+		else if (operator_t == ">") p.conditions.operator_t = OPERATOR_T::GREATER;
+		else if (operator_t == "<") p.conditions.operator_t = OPERATOR_T::LESSER;
 
         	cout << "Condition value (int or string): ";
         	string raw;
-        	cin >> raw;
+		getline(cin, raw);
         	// detect int or string
         	try {
         	    	int v = stoi(raw);
@@ -357,30 +416,7 @@ void PolicyEngine::create_policy() {
         	    	p.conditions.value = raw;
         	}
     	}
-	*/
-
-    	// modify arguments only if modify
-    	if (p.action == ACTION_TYPE::MODIFY) {
-    	    auto ask_arg = [&](const string &name) -> variant<long, string> {
-    	        cout << name << " (value or -1 to skip): ";
-    	        string input;
-    	        getline(cin, input);
-    	        try {
-    	            	return stoi(input);
-    	        } catch (...) {
-    	            	return input;
-    	        }
-    	};
-
-
-
-
-    	p.args.rdi =  ask_arg("rdi");
-    	p.args.rsi =  ask_arg("rsi");
-    	p.args.rdx =  ask_arg("rdx");
-    	p.args.r10 =  ask_arg("r10");
-    	}
-
+	
 	json old_policy;
 
 	// --- Load existing file ---
@@ -410,17 +446,16 @@ void PolicyEngine::create_policy() {
 	pjson["action"] = action;
 	pjson["stub_return"] = p.stub_return;
 
-	//if (p.use_conditions) {
-	//    	json cond;
-	//    	cond["value"] = variant_to_json(p.conditions.value);
-	//    	cond["operator"] = p.conditions.operator_;
-	//    	cond["field"] = p.conditions.field;
-//
-	//    	pjson["use_conditions"] = true;
-	//    	pjson["conditions"] = json::array({ cond });
-	//} else {
-	    	pjson["use_conditions"] = false;
-	//}
+	if (p.use_conditions && (ACTION_TYPE::MODIFY ||p.action == ACTION_TYPE::STUB)) {
+	    	pjson["use_conditions"] = true;
+		pjson["conditions"] = {
+			{"operator", operator_t},
+			{"value", variant_to_json(p.conditions.value)},
+			{"field", field}
+		};
+	} else {
+  	pjson["use_conditions"] = false;
+	}
 
 	if (p.action == ACTION_TYPE::MODIFY) {
 	    	pjson["arguments"] = {
@@ -432,7 +467,6 @@ void PolicyEngine::create_policy() {
 	}
 	// --- Append new entry ---
 	old_policy.push_back(pjson);
-
 	// --- Save file (overwrite with updated array) ---
 	{
 	    	ofstream outfile(policy_config, std::ios::trunc);

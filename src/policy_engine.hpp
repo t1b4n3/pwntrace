@@ -28,7 +28,6 @@ typedef enum {
 	DENY,
 	MODIFY,
 	STUB,
-	LOG_ONLY
 } ACTION_TYPE;
 
 
@@ -81,16 +80,17 @@ class PolicyEngine {
 		ACTION_TYPE parse_action(const string &action_str);
 		static string variant_to_string(const variant<long, string>& v);
 	public:
+		void add_pwntrace_json();
 		void load_policies_from_json();
 		PolicyEngine(); // compile policies and store in policies hashmap
 		Policy evaluate(int syscall_no);
 		void reload();
 		bool should_trace(int syscall_no);  // determin if we should bother evaluting this syscall
 		//Action executions
-		void modify_syscall(pid_t target, int syscall_no, struct user_regs_struct regs, Policy policy);
-		void deny_syscall(pid_t target, int syscall_no, struct user_regs_struct regs, Policy policy);
+		void modify_syscall(pid_t target, struct user_regs_struct regs, Policy policy);
+		void deny_syscall(pid_t target, struct user_regs_struct regs, Policy policy);
 		bool check_conditions(pid_t target, Policy policy, struct user_regs_struct regs);
-		
+		void stub_syscall(pid_t target, struct user_regs_struct regs, Policy policy);
 		// modify register
 		void modify_register(pid_t target, unsigned long long &addr_to_write, variant<long, string>& value);
 
