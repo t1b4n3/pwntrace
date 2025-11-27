@@ -54,9 +54,9 @@ void PolicyEngine::load_policies_from_json() {
     	    	p.action = parse_action(item.value("action", "allow"));
     	    	p.enabled = item.value("enabled", true);
     	    	p.stub_return = item.value("stub_return", 0xffffffffffffffff);
+		p.use_conditions = item.value("use_conditions", false);
 		count++;
 		if (item.contains("arguments")) {
-
 			auto &arg = item["arguments"];
 			if (arg["rdi"].is_string()) {
 				p.args.rdi = arg["rdi"].get<string>();
@@ -65,7 +65,7 @@ void PolicyEngine::load_policies_from_json() {
 			} else if (arg["rdi"].is_null()) {
 				p.args.rdi = long(-1);
 			} else {
-				throw runtime_error("Invalid type for argument rdi");
+				p.args.rsi = arg["rdi"].dump();
 			}
 
 			if (arg["rsi"].is_string()) {
@@ -89,14 +89,54 @@ void PolicyEngine::load_policies_from_json() {
 			} else {
 				p.args.r10 = arg["r10"].dump();
 			}
-			
-			
 		} else {
 			p.args.r10 = long(-1);
 			p.args.rdi = long(-1);
 			p.args.rdx = long(-1);
 			p.args.rsi = long(-1);
 		}
+
+
+		if (item.contains("conditions")) {
+			auto &arg = item["arguments"];
+			string operator_t = arg["operator"];
+			if (operator_t == "=") {
+				p.conditions.operator_t = OPERATOR_T::EQUAL;
+			} else if (operator_t == ">") {
+				p.conditions.operator_t = OPERATOR_T::GREATER;
+			} else if (operator_t == "<") {
+				p.conditions.operator_t = OPERATOR_T::LESSER;
+			} else if (operator_t == "<=") {
+				p.conditions.operator_t = OPERATOR_T::EQUAL_LESSER;
+			} else if (operator_t == ">=") {
+				p.conditions.operator_t = OPERATOR_T::EQUAL_GREATER;
+			} else {
+				p.use_conditions = false;
+			}
+
+			string field = arg["field"];
+			if (field == "rdi") {
+				p.conditions.field = FIELD::rdi;
+			} else if (field == "rsi") {	
+				p.conditions.field = FIELD::rsi;
+			} else if (field == "rdx") {
+				p.conditions.field = FIELD::rdx;
+			} else if (field == "r10") {
+				p.conditions.field = FIELD::r10;
+			} else {
+				p.use_conditions = false;
+			}
+
+			if (arg["value"].is_string()) {
+				p.conditions.value = arg["value"].get<string>();
+			} else if (arg["value"].is_number_integer()) {
+				p.conditions.value = arg["value"].get<long>();
+			}
+
+		}
+
+
+
 
     	    	policies[p.syscall_no] = p;
 		
@@ -129,44 +169,68 @@ void PolicyEngine::deny_syscall(pid_t target, int syscall_no, struct user_regs_s
 	ptrace(PTRACE_SETREGS, target, 0, &regs);
 }
 
-/*
+
 bool PolicyEngine::check_conditions(pid_t target, Policy policy, struct user_regs_struct regs) {
-	if (policy.conditions.field.empty()) return true;
-	long actual_value = 0;
-    
-	// check arg
-    	if (policy.conditions.field == "rdi") {
-#if defined(__x86_64__)
-        actual_value = regs.rdi;
-#elif defined(__i386__)
-        actual_value = regs.ebx;
-#endif
-    	} else if (policy.conditions.field == "rsi") {
-#if defined(__x86_64__)
-        	actual_value = regs.rsi;
-#elif defined(__i386__)
-        	actual_value = regs.ecx;
-#endif
-    	}
-    else if (policy.conditions.field == "rdx") {
-#if defined(__x86_64__)
-	        actual_value = regs.rdx;
-#elif defined(__i386__)
-        	actual_value = regs.edx;
-#endif 
+	ReadMemory read_mem;
+	long long register_t = 0;
+	switch (policy.conditions.field) {
+		case FIELD::rdi:
+			register_t = regs.rdi;
+			break;
+		case FIELD::rdx:
+			register_t = regs.rdx;
+			break;
+		case FIELD::rsi:
+			register_t = regs.rsi;
+			break;
+		case FIELD::r10:
+			register_t = regs.r10;
+			break;
+		default:
+			return false;
 	}
-	if (policy.conditions.operator_ == "equals") {
-		if (holds_alternative<int>(policy.conditions.value)) {
-			return actual_value == get<int>(policy.conditions.value); // 
+
+	if (policy.conditions.operator_t == OPERATOR_T::EQUAL) {
+		if (holds_alternative<long>(policy.conditions.value)) {
+			return  static_cast<long>(register_t) == get<long>(policy.conditions.value);
+		} else if (holds_alternative<string>(policy.conditions.value)) {
+			string reg_value = read_mem.read_string(target, register_t);
+			return reg_value == get<string>(policy.conditions.value);
 		} else {
-			ReadMemory read_mem;
-			string mem_str = read_mem.read_string(target, actual_value, 256);
-			return mem_str == get<string>(policy.conditions.value);
+			return false;
+		}
+	} else if (policy.conditions.operator_t == OPERATOR_T::GREATER) {
+		if (holds_alternative<long>(policy.conditions.value)) {
+			return  get<long>(policy.conditions.value) > static_cast<long>(register_t);
+		} else {
+			return false;
+		}
+	} else if (policy.conditions.operator_t == OPERATOR_T::LESSER) {
+		if (holds_alternative<long>(policy.conditions.value)) {
+			return  get<long>(policy.conditions.value) < static_cast<long>(register_t);
+		} else {
+			return false;
+		}
+	} else if (policy.conditions.operator_t == OPERATOR_T::EQUAL_GREATER) {
+		if (holds_alternative<long>(policy.conditions.value)) {
+			return  get<long>(policy.conditions.value) >= static_cast<long>(register_t);
+		} else {
+			return false;
+		}
+	} else if (policy.conditions.operator_t == OPERATOR_T::EQUAL_LESSER) {
+		if (holds_alternative<long>(policy.conditions.value)) {
+			return  get<long>(policy.conditions.value) <= static_cast<long>(register_t);
+		} else {
+			return false;
 		}
 	}
-	return false;
+	return false; 
 }
-*/
+
+
+
+
+
 void PolicyEngine::modify_register(pid_t target, unsigned long long &addr_to_write, variant<long, string>& value) {
 	WriteMemory write_mem;
 	if (holds_alternative<long>(value)) {
@@ -189,9 +253,12 @@ void PolicyEngine::modify_register(pid_t target, unsigned long long &addr_to_wri
 
 
 void PolicyEngine::modify_syscall(pid_t target, int syscall_no, struct user_regs_struct regs, Policy policy) {
-	//if (policy.use_conditions) {
-	//	if (!check_conditions(target, policy, regs)) return;
-	//}
+	if (policy.use_conditions) {
+		if (!check_conditions(target, policy, regs)) {
+			cout << "\n[-] CONDITIONS NOT MET\n";
+			return;
+		}
+	}
 	struct user_regs_struct saved = regs;
 	//ptrace(PTRACE_GETREGS, target, nullptr, &saved);
 	ReadMemory read_mem;

@@ -32,13 +32,27 @@ typedef enum {
 } ACTION_TYPE;
 
 
-/*
+typedef enum { 
+	EQUAL, // ==
+	GREATER, // >
+	LESSER, // <
+	EQUAL_GREATER, // >=
+	EQUAL_LESSER // <=
+} OPERATOR_T;
+
+
+typedef enum {
+	rdi,
+	rsi,
+	rdx,
+	r10,
+} FIELD;
+
 struct Conditions {
-	string operator_;
-	string field;
-	variant<int, string> value; 
+	OPERATOR_T operator_t;
+	FIELD field;
+	variant<long, string> value; 
 };
-*/
 
 struct Arguments {
 	variant<long, string> rdi;
@@ -53,10 +67,8 @@ struct Policy {
 	int syscall_no;
 	ACTION_TYPE action;
 	bool enabled;
-	// optional fields
-	//bool use_conditions;
-	//Conditions conditions;
-	//vector<variant<int, string>> arguments;
+	bool use_conditions;
+	Conditions conditions;
 	Arguments args;
 	long stub_return = 0xffffffffffffffff;
 };
@@ -77,7 +89,7 @@ class PolicyEngine {
 		//Action executions
 		void modify_syscall(pid_t target, int syscall_no, struct user_regs_struct regs, Policy policy);
 		void deny_syscall(pid_t target, int syscall_no, struct user_regs_struct regs, Policy policy);
-		//bool check_conditions(pid_t target, Policy policy, struct user_regs_struct regs);
+		bool check_conditions(pid_t target, Policy policy, struct user_regs_struct regs);
 		
 		// modify register
 		void modify_register(pid_t target, unsigned long long &addr_to_write, variant<long, string>& value);
