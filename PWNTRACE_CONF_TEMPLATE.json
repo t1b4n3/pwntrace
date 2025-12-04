@@ -1,6 +1,10 @@
 [
     {
-        "action": "modify",            // What to do: modify, deny, allow.
+	"syscall": "write",  		// Name of syscall this rule applies to
+	"enabled": true,               // Enable/disable rule
+        "id": 2,                       // Unique ID
+        "stub_return": -1,             // If action=stub: what value syscall should return   
+        "action": "modify",            // What to do: modify, deny, allow, stub.
 
         "arguments": {                 // Registers to modify (missing ones are untouched)
             "r10": -1,                 // -1 means “don’t modify”
@@ -16,11 +20,6 @@
             "operator": ">=",          // =, >, <, <=, >=
             "field": "rdi",            // Compare this register
             "value": 1337            // To this value
-        },
-
-        "enabled": true,               // Enable/disable rule
-        "id": 2,                       // Unique ID
-        "stub_return": -1,             // If action=stub: what value syscall should return
-        "syscall": "write"             // Name of syscall this rule applies to
+        }
     }
 ]
