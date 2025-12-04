@@ -211,13 +211,13 @@ void tracer(pid_t pid, string pathname) {
 				syscall_no = regs.orig_eax;
 #endif
 				Policy policy = policy_engine.evaluate(syscall_no);
-
+				
 				switch (policy.action) {
 					case ACTION_TYPE::DENY:
 						// skip syscall and ret fake return
 						if (!in_syscall) {
 							in_syscall = true;
-							policy_engine.deny_syscall(target, policy.syscall_no, regs, policy);
+							policy_engine.deny_syscall(target, regs, policy);
 						} else {
 							in_syscall = false;
 						}
@@ -225,18 +225,23 @@ void tracer(pid_t pid, string pathname) {
 					case ACTION_TYPE::MODIFY:
 						if (!in_syscall) {
 							in_syscall = true;
-							policy_engine.modify_syscall(target, policy.syscall_no, regs, policy);
+							policy_engine.modify_syscall(target, regs, policy);
+						} else {
+							in_syscall = false;
+						}
+						break;
+					case ACTION_TYPE::STUB:
+						if (!in_syscall) {
+							in_syscall = true;
+							policy_engine.stub_syscall(target, regs, policy);
 						} else {
 							in_syscall = false;
 						}
 					default:
-						//  do nothing let syscall execute normally | ACTION_TYPE::ALLOW:
 						if (!in_syscall) {
-                					// syscall entry
                 					in_syscall = true;
 							print_syscall(SYSCALL_ENTRY, target, policy_engine);
             					} else {
-                					// syscall exit
                 					in_syscall = false;
                 					print_syscall(SYSCALL_EXIT, target, policy_engine);
             					}

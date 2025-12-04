@@ -40,9 +40,6 @@ void CLI::parse_and_execute(const string& line) {
 	string token;
 	while (iss >> token) args.push_back(token);
 
-
-
-
 	if (!it->second.execute(cmdName, args)) {
 		cout << "[-] Unkown Command: " << cmdName << " in group " << groupName << endl;
 	}
