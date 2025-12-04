@@ -79,6 +79,7 @@ class PolicyEngine {
 		static ACTION_TYPE compile_handler(struct Policy policy);
 		ACTION_TYPE parse_action(const string &action_str);
 		static string variant_to_string(const variant<long, string>& v);
+		void map_to_json();
 	public:
 		void add_pwntrace_json();
 		void load_policies_from_json();

@@ -65,7 +65,10 @@ void PolicyEngine::load_policies_from_json() {
 
     	for (auto &item : j) {
     	    	Policy p;
-    	    	p.id = item["id"];
+		int id = item["id"];
+		auto it = policies.find(id);
+		if (it != policies.end()) continue;
+    	    	p.id = id;
     	    	p.syscall = item["syscall"];
     	    	p.syscall_no = table.get_syscall_no(item["syscall"]);
     	    	p.action = parse_action(item.value("action", "allow"));
@@ -474,6 +477,7 @@ void PolicyEngine::create_policy() {
 	}
 
 	count++;
+	reload();
 }
 
 json PolicyEngine::variant_to_json(const variant<long, string> &v) {
@@ -517,7 +521,7 @@ void PolicyEngine::add_commands() {
 
 void PolicyEngine::list_policies() {
 	cout << "\n=== Existing Policies ===\n";
-
+	reload();
     	if (policies.empty()) {
     	    	cout << "No policies found.\n";
     	    	return;
@@ -544,70 +548,115 @@ void PolicyEngine::list_policies() {
 	}
 }
 
+void PolicyEngine::map_to_json() {
+	for (const auto &entry : policies) {
+		json old_policy;
+
+		{
+		    	ifstream infile(policy_config);
+
+		    	if (!infile.is_open()) {
+		    	    old_policy = json::array();     // create empty list
+		    	} else {
+		    	    infile >> old_policy;
+		    	}
+		}
+
+		if (!old_policy.is_array()) {
+		    // Convert object/single-policy into array
+		    	json tmp = json::array();
+		    	tmp.push_back(old_policy);
+		    	old_policy = tmp;
+		}
+
+		json pjson;
+		const Policy &p = entry.second;
+		pjson["id"] = p.id;
+		pjson["syscall"] = p.syscall;
+		pjson["enabled"] = p.enabled;
+
+		string action;
+		switch (p.action) {
+			case ACTION_TYPE::DENY:
+				action = "deny";
+				break;
+			case ACTION_TYPE::MODIFY:
+				action = "modify";
+				break;
+			case ACTION_TYPE::STUB:
+				action = "stub";
+				break;
+			default:
+				action = "allow";
+		}
+
+		string field;
+		switch (p.conditions.field) {
+			case FIELD::rdi:
+				field = "rdi";
+				break;
+			case FIELD::rsi:
+				field = "rsi";
+				break;
+			case FIELD::rdx:
+				field = "rdx";
+				break;
+			case FIELD::r10:
+				field = "r10";
+				break;
+		}
+
+		pjson["action"] = action;
+		pjson["stub_return"] = p.stub_return;
+
+		if (p.use_conditions && (ACTION_TYPE::MODIFY ||p.action == ACTION_TYPE::STUB)) {
+		    	pjson["use_conditions"] = true;
+			pjson["conditions"] = {
+				{"operator", p.conditions.operator_t},
+				{"value", variant_to_json(p.conditions.value)},
+				{"field", field}
+			};
+		} else {
+  		pjson["use_conditions"] = false;
+		}
+
+		if (p.action == ACTION_TYPE::MODIFY) {
+		    	pjson["arguments"] = {
+		    	    	{"rdi", variant_to_json(p.args.rdi)},
+		    	    	{"rsi", variant_to_json(p.args.rsi)},
+		    	    	{"rdx", variant_to_json(p.args.rdx)},
+		    	    	{"r10", variant_to_json(p.args.r10)}
+		    	};
+		}
+		// --- Append new entry ---
+		old_policy.push_back(pjson);
+		// --- Save file (overwrite with updated array) ---
+		{
+		    	ofstream outfile(policy_config, std::ios::trunc);
+		    	outfile << old_policy.dump(4);
+		}
+	}
+}
+
 void PolicyEngine::remove_policy() {
+	if (policies.empty()) {
+		cout << "No policies found\n"; 
+	}
 	cout << "Enter ID to delete: ";
 	int id; 
 	cin >> id;
-	
+
+	auto it = policies.find(id);
+	if (it == policies.end()) {
+		cout << "Policy not found\n";
+		return;
+	}
+	policies.erase(it);
 	count--;
+	map_to_json();
 }
 
 void PolicyEngine::edit_policy() {
 	Policy p;
     	cout << "=== Edit Policy ===\n";
-
-    	// syscall
-    	cout << "Enter syscall: ";
-    	cin >> p.syscall;
-
-    	// action
-	string action;
-    	cout << "Action (allow/deny/modify): ";
-    	cin >> action;
-	
-	if (action == "allow") {
-		p.action = ACTION_TYPE::ALLOW;
-	} else if (action == "deny") {
-		p.action = ACTION_TYPE::DENY;
-	} else if (action == "modify") {
-		p.action = ACTION_TYPE::MODIFY;
-	}
-    	// enabled
-    	cout << "Enable this policy? (1=yes, 0=no): ";
-    	cin >> p.enabled;
-
-    	
-    	// modify arguments only if modify
-    	if (p.action == ACTION_TYPE::MODIFY) {
-    	   	auto ask_arg = [&](const string &name) -> variant<long, string> {
-    	        	cout << name << " (value or -1 to skip): ";
-    	        	string input;
-    	        	cin >> input;
-
-    	        	try {
-    	        	    return stoi(input);
-    	        	} catch (...) {
-    	        	    return input;
-    	        	}
-    		 };
-
-	}
-
-	json j;
-	j["id"] = p.id;
-	j["syscall"] = p.syscall;
-	j["enabled"] = p.enabled;
-
-	if (p.action == ACTION_TYPE::MODIFY) {
-	    	j["arguments"] = {
-	    	    	{"rdi", variant_to_json(p.args.rdi)},
-	    	    	{"rsi", variant_to_json(p.args.rsi)},
-	    	    	{"rdx", variant_to_json(p.args.rdx)},
-	    	    	{"r10", variant_to_json(p.args.r10)}
-	    	};
-	}
-
-	ofstream outfile(policy_config);
-	outfile << j.dump(4);
-	cout << "\nPolicy saved to " << policy_config << "\n";
 }
