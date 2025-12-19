@@ -80,3 +80,11 @@ void PrintSyscall::pexit() {
 	cout << ptable.get_syscall_name(pregs.orig_rax)
 		<< "(0x" << hex << pregs.rdi << ")";
 }
+
+void PrintSyscall::popenat() {
+	printf("%s(0x%llx, 0x%llx, 0x%llx)", 
+				ptable.get_syscall_name(pregs.orig_rax).c_str(), 
+				pregs.rdi, pregs.rsi, pregs.rdx);
+	cout  << " | Opening : '" << pread_mem.read_string(ptarget, pregs.rsi, 512)
+              << "' Flags : " << std::dec << pregs.rdx;
+} 

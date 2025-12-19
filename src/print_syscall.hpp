@@ -31,6 +31,7 @@ class PrintSyscall {
 		void pexecve();
 		void popen();
 		void pexit();
+		void popenat();
 };
 
 

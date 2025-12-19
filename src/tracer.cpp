@@ -33,6 +33,7 @@ void print_syscall(SYSCALL sys, pid_t target, PolicyEngine policy_engine) {
 			case 3: pt.pclose(); break;
 			case 59: pt.pexecve(); break;
 			case 60: pt.pexit(); break;
+			case 257: pt.popenat(); break;
 			default:
 				printf("%s(0x%llx, 0x%llx, 0x%llx)", 
 				table.get_syscall_name(regs.orig_rax).c_str(), 
