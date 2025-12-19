@@ -28,6 +28,7 @@ typedef enum {
 	DENY,
 	MODIFY,
 	STUB,
+	BREAKPOINT
 } ACTION_TYPE;
 
 
@@ -90,6 +91,7 @@ class PolicyEngine {
 		//Action executions
 		void modify_syscall(pid_t target, struct user_regs_struct regs, Policy policy);
 		void deny_syscall(pid_t target, struct user_regs_struct regs, Policy policy);
+		void breakpoint(pid_t target, struct user_regs_struct regs, Policy policy);
 		bool check_conditions(pid_t target, Policy policy, struct user_regs_struct regs);
 		void stub_syscall(pid_t target, struct user_regs_struct regs, Policy policy);
 		// modify register

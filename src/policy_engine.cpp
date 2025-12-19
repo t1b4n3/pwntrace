@@ -179,7 +179,13 @@ Policy PolicyEngine::evaluate(int syscall_no) {
 }
 
 void PolicyEngine::stub_syscall(pid_t target, struct user_regs_struct regs, Policy policy) {
-	cout << "\n[-] STUB : " << policy.syscall_no;
+	SyscallTable table;
+	printf("\n[-] STUB :  %s(0x%llx, 0x%llx, 0x%llx) = stub(0x%llx)", 
+				table.get_syscall_name(regs.orig_rax).c_str(), 
+				regs.rdi, regs.rsi, regs.rdx, policy.stub_return);
+	//cout << "\n[-] STUB : " << hex << policy.syscall_no << " = ";
+	regs.rax = policy.stub_return;
+	ptrace(PTRACE_SETREGS, target, 0, &regs);
 }
 
 void PolicyEngine::deny_syscall(pid_t target, struct user_regs_struct regs, Policy policy) {
@@ -269,6 +275,10 @@ void PolicyEngine::modify_register(pid_t target, unsigned long long &addr_to_wri
 			addr_to_write = new_addr;
 		}	
 	}
+}
+
+void PolicyEngine::breakpoint(pid_t target, struct user_regs_struct regs, Policy policy) {
+	
 }
 
 
