@@ -4,7 +4,7 @@
 	"enabled": true,               // Enable/disable rule
         "id": 2,                       // Unique ID
         "stub_return": -1,             // If action=stub: what value syscall should return   
-        "action": "modify",            // What to do: modify, deny, allow, stub.
+        "action": "modify",            // What to do: modify, deny, allow, stub, breakpoint.
 
         "arguments": {                 // Registers to modify (missing ones are untouched)
             "r10": -1,                 // -1 means “don’t modify”
