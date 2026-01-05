@@ -54,6 +54,7 @@ class CLI {
 		CommandGroup& add_group(const string& name);
 		void parse_and_execute(const string& line);
 		void cli();
+		void breakpoing_cli(string syscall);
 
 };
 

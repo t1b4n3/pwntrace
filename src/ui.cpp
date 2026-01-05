@@ -80,6 +80,32 @@ void CLI::cli() {
 	write_history(histfile.c_str());
 }
 
+
+void CLI::breakpoing_cli(string syscall) {
+	rl_attempted_completion_function = cli_completion;
+
+	string histfile = expand_home("~/.pwntrace.txt");
+
+	using_history();
+	read_history(histfile.c_str());
+	char *input;
+	char *cmd;
+	sprintf(cmd, "[pwntrace](%)> ", syscall.c_str());
+	while (true) {
+		
+		input = readline(cmd);
+		if (!input) break;
+		string line(input);
+		free(input);
+		if (line.empty()) continue;
+		if (line == "exit" || line == "q" || line == "quit") break;
+		add_history(line.c_str());
+		parse_and_execute(line);
+	}
+	write_history(histfile.c_str());
+}
+
+
 char *CLI::cmd_generator(const char* text, int state) {
 	static size_t list_index;
 	static std::vector<std::string> matches;
