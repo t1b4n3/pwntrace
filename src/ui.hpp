@@ -2,15 +2,24 @@
 #define UI_H
 
 #pragma once
+#include <cstdio>
+#include <cstdlib>
 #include <iostream>
 #include <string>
+#include <string> 
+#include <unistd.h> 
 #include <unordered_map>
 #include <functional>
 #include <vector>
 #include <sstream>
 #include <readline/readline.h>
 #include <readline/history.h>
+#include <unistd.h>
 
+#include "./tracer.hpp"
+#include "./policy_engine.hpp"
+#include "./print_syscall.hpp"
+#include "./syscall_table.hpp"
 
 using namespace std;
 
@@ -54,7 +63,7 @@ class CLI {
 		CommandGroup& add_group(const string& name);
 		void parse_and_execute(const string& line);
 		void cli();
-		void breakpoing_cli(string syscall);
+		void breakpoint_cli(string syscall);
 
 };
 
