@@ -526,7 +526,24 @@ void PolicyEngine::add_commands() {
 
 	policy.add("edit", "edit policy", [&](auto args){
 		edit_policy();
-	});	
+	});
+
+	policy.add("policy", "view file path", [&](auto args) {
+		cout << "[+] Policy File Path : " << policy_config << endl;
+	});
+
+	policy.add("change", "change policy file", [&](auto args){
+		if (args.empty()) {
+			cout << "[-] Usage: add policy <path/to/policy.json>" << endl;
+			return;
+		}
+		string tmp = args[0];
+		if (access(tmp.c_str(), F_OK)) {
+			cout << "[-] File no found || Permissions denied\n";
+			return;
+		}
+		policy_config = tmp;
+	});
 }
 
 void PolicyEngine::list_policies() {
