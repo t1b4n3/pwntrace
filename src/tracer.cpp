@@ -1,8 +1,14 @@
 #include "./tracer.hpp"
 
 #include "./print_syscall.hpp"
+#include "./policy_engine.hpp"
 
 struct user_regs_struct regs;
+
+
+pid_t pid;
+string pathname;
+
 
 void print_syscall(SYSCALL sys, pid_t target, PolicyEngine policy_engine) {
 	ReadMemory read_mem;
@@ -83,7 +89,8 @@ void print_syscall(SYSCALL sys, pid_t target, PolicyEngine policy_engine) {
 }
 
 
-void tracer(pid_t pid, string pathname) {
+//void tracer(pid_t pid, string pathname) {
+void tracer() {
 	log_message(LOG_INFO, "Pwntrace");
 	SyscallTable table;
 
@@ -145,7 +152,9 @@ void tracer(pid_t pid, string pathname) {
 			}
 			log_message(LOG_INFO, "Launched child stopped (status=0x%x)", status);
 		}
-	} 	
+	} else {
+		cout << "[-] add binary or attach to running process first" << endl;
+	}
 
 	
 	// Print initial regsiters

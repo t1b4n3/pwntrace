@@ -24,21 +24,28 @@
 #include "./memory.hpp"
 #include "./syscall_table.hpp"
 #include "./policy_engine.hpp"
+#include "./ui.hpp"
+
+#pragma once
 
 using namespace std;
 using namespace nlohmann;
 using std::get;
 using std::holds_alternative;
 
+class PolicyEngine;
+
 typedef enum {
 	SYSCALL_ENTRY, 
 	SYSCALL_EXIT,
 } SYSCALL;
 
+extern pid_t pid;
+extern string pathname;
+
 
 void print_syscall(SYSCALL sys, pid_t target, PolicyEngine policy_engine);
 
-void tracer(pid_t pid, string pathname);
-
-
+//void tracer(pid_t pid, string pathname);
+void tracer();
 #endif
