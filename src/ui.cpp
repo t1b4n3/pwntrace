@@ -4,11 +4,24 @@ CLI GlobalCLI;
 
 //unordered_map<string, Command> CommandGroup::commands;
 //unordered_map<string, CommandGroup> CLI::groups;
+static void help() {
+	// add
+	cout << "	=== Attach/Spawn process ===\n";
+	cout << "	binary <path/to/binary>			Spawn a new process\n";
+	cout << "	pid <pid>				Attach a process\n";
+	cout << "	=== Policy ===\n";
+	cout << "	policy add				Add a policy\n";
+	cout << "	policy list				List available polices\n";
+	cout << "	policy delete				Remove a policy\n";
+	
+	
+	
+	
+	cout << "	=== ===\n";
+}
 
 
-
-void CommandGroup::add(const string cmd, const string desc, 
-	function<void(const vector<string>&)> fn) {
+void CommandGroup::add(const string cmd, const string desc, function<void(const vector<string>&)> fn) {
 	commands()[cmd] = Command{cmd, desc, fn};
 }
 
@@ -31,7 +44,7 @@ void CLI::parse_and_execute(const string& line) {
 	} 
 
 	if (cmdName.empty()) {
-		cmdName = "_defualt";
+		cmdName = "_default";
 	}
 
 	if (groupName.empty()) return;
@@ -59,7 +72,7 @@ CommandGroup& CLI::add_group(const string& name) {
 }
 
 void CLI::cli() {
-	rl_attempted_completion_function = cli_completion;
+	//rl_attempted_completion_function = cli_completion;
 
 	string histfile = expand_home("~/.pwntrace.txt");
 
@@ -74,6 +87,45 @@ void CLI::cli() {
 		free(input);
 		if (line.empty()) continue;
 		if (line == "exit" || line == "q" || line == "quit") break;
+		else if (line == "help" || line == "h") {
+			help();
+			continue;
+		}
+		else if (strncmp(line.c_str(), "binary", 6) == 0) {
+			if (!line.starts_with("binary ")) {
+			   	cout << "[-] Usage: binary <path/to/binary>\n";
+			   	continue;
+			}
+
+			string tmp = line.substr(7);
+			tmp.pop_back();
+			if (access(tmp.c_str(), F_OK)) {
+				cout << "[-] Executable not found or permission denied\n";
+			} else {
+			   	pathname = tmp;
+			}
+			continue;
+		} else if (strncmp(line.c_str(), "pid", 3) == 0) {
+			pid_t tmp;
+			if (!line.starts_with("pid ")) {
+				cout << "[-] Usage: pid <pid>" << endl;
+			}
+			string tmp1 = line.substr(4);
+			try {
+				pid_t tmp2 = stoi(tmp1);
+				pid = tmp2;
+			} catch (const exception &e) {
+				cout << "Invalid PID: " << tmp << endl;
+			
+			}
+			continue;
+		} else if (line == "run" || line == "r") {
+			//tracer(pid, pathname);
+			cout << "[=] Running binary : " << pathname << " || pid : " << pid << endl;
+			cout << "=== 	===\n";
+			tracer();
+			continue;
+		}
 		add_history(line.c_str());
 		parse_and_execute(line);
 	}
@@ -81,8 +133,8 @@ void CLI::cli() {
 }
 
 
-void CLI::breakpoing_cli(string syscall) {
-	rl_attempted_completion_function = cli_completion;
+void CLI::breakpoint_cli(string syscall) {
+	//rl_attempted_completion_function = cli_completion;
 
 	string histfile = expand_home("~/.pwntrace.txt");
 
@@ -99,6 +151,7 @@ void CLI::breakpoing_cli(string syscall) {
 		free(input);
 		if (line.empty()) continue;
 		if (line == "exit" || line == "q" || line == "quit") break;
+		else if (line == "help" || line == "h") help();
 		add_history(line.c_str());
 		parse_and_execute(line);
 	}
