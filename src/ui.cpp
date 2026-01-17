@@ -13,7 +13,11 @@ static void help() {
 	cout << "	policy add				Add a policy\n";
 	cout << "	policy list				List available polices\n";
 	cout << "	policy delete				Remove a policy\n";
-	
+	cout << "	policy edit				Edit a policy\n";
+	cout << "	policy reload				Reload policy configuration file\n";
+	cout << " 	policy view				View current policy file\n";
+	cout << "	policy change				Change policy file\n";
+	//cout << "	=== "
 	
 	
 	
@@ -85,8 +89,20 @@ void CLI::cli() {
 		if (!input) break;
 		string line(input);
 		free(input);
+		add_history(line.c_str());
 		if (line.empty()) continue;
 		if (line == "exit" || line == "q" || line == "quit") break;
+		else if (strncmp(line.c_str(), "log-file", 8) == 0) {
+			if (!line.starts_with("log-file ")) {
+				cout << "[-] Usage: log-file <path/to/logfile\n";
+				continue;
+			}
+			string tmp_file = line.substr(9);
+			//tmp_file.pop_back();
+			set_logfile_path(tmp_file.c_str());
+			cout << "[+] log-file set to " << tmp_file << endl;
+			continue;
+		}
 		else if (line == "help" || line == "h") {
 			help();
 			continue;
@@ -126,7 +142,6 @@ void CLI::cli() {
 			tracer();
 			continue;
 		}
-		add_history(line.c_str());
 		parse_and_execute(line);
 	}
 	write_history(histfile.c_str());

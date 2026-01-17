@@ -16,6 +16,7 @@
 #include <readline/history.h>
 #include <unistd.h>
 
+#include "./logging.hpp"
 #include "./tracer.hpp"
 #include "./policy_engine.hpp"
 #include "./print_syscall.hpp"
