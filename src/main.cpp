@@ -37,6 +37,7 @@ bool is_config_loaded() {
 int main(int argc, char* argv[]) {
 	pid = -1;
 	//policy_config = "./pwntrace.json";
+	policy_engine.add_pwntrace_json();
 	policy_engine.load_policies_from_json();
 	program_name = argv[0];
 	GlobalCLI.cli();	
